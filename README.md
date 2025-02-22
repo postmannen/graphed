@@ -15,4 +15,3 @@ Graph database written in Go .... or rather a POC for a graph database written i
 ### Query language ?
 
 ### Graphs inside nodes ?
-
