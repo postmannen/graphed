@@ -60,6 +60,17 @@ func NewNodeStore() *NodeStore {
 	return &n
 }
 
+// AddValue adds a value to a node
+func (ns *NodeStore) AddValue(name string, value []byte) error {
+	id := ns.nameToId[name]
+	if id == uuid.Nil {
+		return fmt.Errorf("node %s not found", name)
+	}
+
+	ns.nodes[id].value = append(ns.nodes[id].value, value)
+	return nil
+}
+
 // AddNode adds a new node to the store
 //
 // TODO: Add AddValue method to add a value to the node

@@ -15,8 +15,15 @@ func main() {
 	// Add some nodes
 	store.AddNode("root", "")
 
+	// Customer 1
 	store.AddNode("customer1", "root")
 
+	store.AddNode("customer1.location1", "customer1")
+	store.AddNode("customer1.location1.service1", "customer1.location1")
+	store.AddValue("customer1.location1.service1", []byte("testdata customer1 1"))
+	store.AddValue("customer1.location1.service1", []byte("testdata customer1 2"))
+	store.AddValue("customer1.location1.service1", []byte("testdata customer1 3"))
+	// Customer 2
 	store.AddNode("customer2", "root")
 
 	store.AddNode("customer2.location1", "customer2")
