@@ -14,27 +14,20 @@ func main() {
 
 	// Add some nodes
 	store.AddNode("root", "Root Value", "")
-	store.AddNode("child1", "Child 1 Value", "root")
-	store.AddNode("child2", "Child 2 Value", "root")
-	store.AddNode("grandchild1", "Grandchild 1 Value", "child1")
 
-	// Get and print node information
-	if node, err := store.Node("child1"); err == nil {
-		fmt.Printf("Node: %s\n", node.Name())
-		fmt.Printf("Value: %s\n", node.Value())
-		fmt.Printf("Parent: %s\n", node.Parent().Name())
-		fmt.Printf("Children count: %d\n", len(node.Children()))
-	}
+	store.AddNode("customer1", "customer1-value", "root")
 
-	fmt.Println("--------------------------------")
+	store.AddNode("customer2", "customer2-value", "root")
 
-	// Get and print node information
-	if node, err := store.Node("root"); err == nil {
-		fmt.Printf("Node: %s\n", node.Name())
-		fmt.Printf("Value: %s\n", node.Value())
-		fmt.Printf("Parent: %s\n", node.Parent().Name())
-		fmt.Printf("Children count: %d\n", len(node.Children()))
-	}
+	store.AddNode("customer2.location1", "customer2.location1-value", "customer2")
+
+	store.AddNode("customer2.location2", "customer2.location2-value", "customer2")
+	store.AddNode("customer2.location1.service1", "customer2.location1.service1-value", "customer2.location1")
+
+	store.AddNode("customer2.location2.service1.logs", "customer2.location2.service1.logs-value", "customer2.location2.service1")
+	store.AddNode("AD.logs", "AD log line 1", "customer2.location2.service1.logs")
+	store.AddNode("AD.logs", "AD log line 2", "customer2.location2.service1.logs")
+	store.AddNode("AD.logs", "AD log line 3", "customer2.location2.service1.logs")
 
 	fmt.Println("--------------------------------")
 
