@@ -9,7 +9,7 @@ import (
 func benchmarkNodeStoreSize(n int, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		store := NewNodeStore[string]()
+		store := NewNodeStore()
 		b.StartTimer()
 
 		// Add root node
@@ -51,7 +51,7 @@ func BenchmarkNodeStore10000(b *testing.B) { benchmarkNodeStoreSize(10000, b) }
 
 // Benchmark individual operations
 func BenchmarkAddNode(b *testing.B) {
-	store := NewNodeStore[string]()
+	store := NewNodeStore()
 	store.AddNode("root", "")
 
 	b.ResetTimer()
@@ -62,7 +62,7 @@ func BenchmarkAddNode(b *testing.B) {
 }
 
 func BenchmarkNodeLookup(b *testing.B) {
-	store := NewNodeStore[string]()
+	store := NewNodeStore()
 	store.AddNode("root", "")
 	store.AddNode("test_node1", "root")
 	store.AddNode("test_node2", "root")

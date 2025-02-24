@@ -45,14 +45,14 @@ func (n *Node) Children() map[uuid.UUID]*Node {
 }
 
 // NodeStore represents the graph data store
-type NodeStore[T any] struct {
+type NodeStore struct {
 	nodes    map[uuid.UUID]*Node
 	nameToId map[string]uuid.UUID
 }
 
 // NewNodeStore creates a new instance of NodeStore
-func NewNodeStore[T any]() *NodeStore[T] {
-	n := NodeStore[T]{
+func NewNodeStore() *NodeStore {
+	n := NodeStore{
 		nodes:    make(map[uuid.UUID]*Node),
 		nameToId: make(map[string]uuid.UUID),
 	}
@@ -63,7 +63,7 @@ func NewNodeStore[T any]() *NodeStore[T] {
 // AddNode adds a new node to the store
 //
 // TODO: Add AddValue method to add a value to the node
-func (ns *NodeStore[T]) AddNode(name string, parentName string) error {
+func (ns *NodeStore) AddNode(name string, parentName string) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return fmt.Errorf("failed to generate UUID: %w", err)
@@ -103,7 +103,7 @@ func (ns *NodeStore[T]) AddNode(name string, parentName string) error {
 }
 
 // Node retrieves a node and its relationships from the store
-func (ns *NodeStore[T]) Node(name string) (*Node, error) {
+func (ns *NodeStore) Node(name string) (*Node, error) {
 	if name == "" {
 		return nil, fmt.Errorf("node %s name is empty", name)
 	}
@@ -121,7 +121,7 @@ func (ns *NodeStore[T]) Node(name string) (*Node, error) {
 }
 
 // AllNodes returns all nodes in the store
-func (ns *NodeStore[T]) AllNodes() map[uuid.UUID]*Node {
+func (ns *NodeStore) AllNodes() map[uuid.UUID]*Node {
 	return ns.nodes
 }
 

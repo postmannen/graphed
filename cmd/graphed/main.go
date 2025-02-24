@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Example usage
-	store := graphed.NewNodeStore[string]()
+	store := graphed.NewNodeStore()
 
 	// Add some nodes
 	store.AddNode("root", "")
