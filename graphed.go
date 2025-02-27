@@ -1,67 +1,58 @@
 package graphed
 
 import (
-	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/gofrs/uuid"
 )
 
-// Node represents a node with a generic value in the graph
-type Node[T any] struct {
-	id       uuid.UUID
-	name     string
-	value    T
-	parent   *Node[T]
-	children map[uuid.UUID]*Node[T]
-}
-
-// Name returns the name of the node
-func (n *Node[T]) Name() string {
-	if n == nil {
-		return ""
-	}
-
-	return n.name
-}
-
-// Value returns the value of the node
-func (n *Node[T]) Value() T {
-	return n.value
-}
-
-// Parent returns the parent of the node
-func (n *Node[T]) Parent() *Node[T] {
-	if n.parent == nil {
-		return nil
-	}
-
-	return n.parent
-}
-
-// Children returns the children of the node
-func (n *Node[T]) Children() map[uuid.UUID]*Node[T] {
-	return n.children
+// Node in graph
+type Node struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	// TODO: Make use of timestamp
+	Timestamp time.Time `json:"timestamp"`
+	// Single value. Ex. single log line.
+	Value []byte `json:"value"`
+	// multiple values. Ex. multiple log lines.
+	Values [][]byte  `json:"values"`
+	Parent uuid.UUID `json:"parent,omitempty"`
+	// HERE !!!!!!!!!!!!
+	Children map[uuid.UUID]struct{} `json:"children,omitempty"`
 }
 
 // NodeStore represents the graph data store
-type NodeStore[T any] struct {
-	nodes    map[uuid.UUID]*Node[T]
+type NodeStore struct {
+	nodes    map[uuid.UUID]*Node
 	nameToId map[string]uuid.UUID
 }
 
 // NewNodeStore creates a new instance of NodeStore
-func NewNodeStore[T any]() *NodeStore[T] {
-	n := NodeStore[T]{
-		nodes:    make(map[uuid.UUID]*Node[T]),
+func NewNodeStore() *NodeStore {
+	n := NodeStore{
+		nodes:    make(map[uuid.UUID]*Node),
 		nameToId: make(map[string]uuid.UUID),
 	}
 
 	return &n
 }
 
+// AddValue adds a value to a node
+func (ns *NodeStore) AddToValues(name string, value []byte) error {
+	id := ns.nameToId[name]
+	if id == uuid.Nil {
+		return fmt.Errorf("node %s not found", name)
+	}
+
+	ns.nodes[id].Values = append(ns.nodes[id].Values, value)
+	return nil
+}
+
 // AddNode adds a new node to the store
-func (ns *NodeStore[T]) AddNode(name string, value T, parentName string) error {
+//
+// TODO: Add AddValue method to add a value to the node
+func (ns *NodeStore) AddNode(name string, parentName string) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return fmt.Errorf("failed to generate UUID: %w", err)
@@ -71,11 +62,11 @@ func (ns *NodeStore[T]) AddNode(name string, value T, parentName string) error {
 	ns.nameToId[name] = id
 
 	// Create new node
-	newNode := &Node[T]{
-		id:       id,
-		name:     name,
-		value:    value,
-		children: make(map[uuid.UUID]*Node[T]),
+	newNode := &Node{
+		ID:       id,
+		Name:     name,
+		Values:   make([][]byte, 0),
+		Children: make(map[uuid.UUID]struct{}),
 	}
 
 	var parentId uuid.UUID
@@ -89,10 +80,10 @@ func (ns *NodeStore[T]) AddNode(name string, value T, parentName string) error {
 		// If there is a parent, add the new node to the parent's children
 		parent := ns.nodes[parentId]
 
-		parent.children[id] = newNode
+		parent.Children[id] = struct{}{}
 
 		// Set the parent of the new node
-		newNode.parent = parent
+		newNode.Parent = parentId
 	}
 
 	// Add node to store
@@ -101,7 +92,7 @@ func (ns *NodeStore[T]) AddNode(name string, value T, parentName string) error {
 }
 
 // Node retrieves a node and its relationships from the store
-func (ns *NodeStore[T]) Node(name string) (*Node[T], error) {
+func (ns *NodeStore) Node(name string) (*Node, error) {
 	if name == "" {
 		return nil, fmt.Errorf("node %s name is empty", name)
 	}
@@ -119,36 +110,39 @@ func (ns *NodeStore[T]) Node(name string) (*Node[T], error) {
 }
 
 // AllNodes returns all nodes in the store
-func (ns *NodeStore[T]) AllNodes() map[uuid.UUID]*Node[T] {
+func (ns *NodeStore) AllNodes() map[uuid.UUID]*Node {
 	return ns.nodes
 }
 
-// NodeJSON is a helper struct for JSON marshaling
-type NodeJSON[T any] struct {
-	Name          string   `json:"name"`
-	Value         T        `json:"value"`
-	ParentName    string   `json:"parent,omitempty"`
-	ChildrenNames []string `json:"children,omitempty"`
-}
-
-// MarshalJSON implements custom JSON marshaling for Node
-func (n *Node[T]) MarshalJSON() ([]byte, error) {
-
-	nodeJSON := NodeJSON[T]{
-		Name:  n.Name(),
-		Value: n.Value(),
-	}
-
-	if n.Parent() != nil {
-		nodeJSON.ParentName = n.Parent().Name()
-	}
-
-	if len(n.Children()) > 0 {
-		nodeJSON.ChildrenNames = make([]string, 0, len(n.Children()))
-		for childId := range n.Children() {
-			nodeJSON.ChildrenNames = append(nodeJSON.ChildrenNames, childId.String())
-		}
-	}
-
-	return json.Marshal(nodeJSON)
-}
+// // NodeJSON is a helper struct for JSON marshaling
+// type NodeJSON struct {
+// 	Name          string    `json:"name"`
+// 	Timestamp     time.Time `json:"timestamp"`
+// 	Value         []byte    `json:"value"`
+// 	Values        [][]byte  `json:"values"`
+// 	ParentName    string    `json:"parent,omitempty"`
+// 	ChildrenNames []string  `json:"children,omitempty"`
+// }
+//
+// // MarshalJSON implements custom JSON marshaling for Node
+// func (n *Node) MarshalJSON() ([]byte, error) {
+//
+// 	nodeJSON := NodeJSON{
+// 		Name:   n.Name(),
+// 		Value:  n.Value(),
+// 		Values: n.Values(),
+// 	}
+//
+// 	if n.Parent() != nil {
+// 		nodeJSON.ParentName = n.Parent().Name()
+// 	}
+//
+// 	if len(n.Children()) > 0 {
+// 		nodeJSON.ChildrenNames = make([]string, 0, len(n.Children()))
+// 		for childId := range n.Children() {
+// 			nodeJSON.ChildrenNames = append(nodeJSON.ChildrenNames, childId.String())
+// 		}
+// 	}
+//
+// 	return json.Marshal(nodeJSON)
+// }

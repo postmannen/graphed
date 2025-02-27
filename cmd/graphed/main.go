@@ -10,31 +10,31 @@ import (
 
 func main() {
 	// Example usage
-	store := graphed.NewNodeStore[string]()
+	store := graphed.NewNodeStore()
 
 	// Add some nodes
-	store.AddNode("root", "Root Value", "")
-	store.AddNode("child1", "Child 1 Value", "root")
-	store.AddNode("child2", "Child 2 Value", "root")
-	store.AddNode("grandchild1", "Grandchild 1 Value", "child1")
+	store.AddNode("root", "")
 
-	// Get and print node information
-	if node, err := store.Node("child1"); err == nil {
-		fmt.Printf("Node: %s\n", node.Name())
-		fmt.Printf("Value: %s\n", node.Value())
-		fmt.Printf("Parent: %s\n", node.Parent().Name())
-		fmt.Printf("Children count: %d\n", len(node.Children()))
-	}
+	// Customer 1
+	store.AddNode("customer1", "root")
 
-	fmt.Println("--------------------------------")
+	store.AddNode("customer1.location1", "customer1")
+	store.AddNode("customer1.location1.service1", "customer1.location1")
+	store.AddToValues("customer1.location1.service1", []byte("some data customer1 1"))
+	store.AddToValues("customer1.location1.service1", []byte("some other data customer1 2"))
+	store.AddToValues("customer1.location1.service1", []byte("even more data customer1 3"))
+	// Customer 2
+	store.AddNode("customer2", "root")
 
-	// Get and print node information
-	if node, err := store.Node("root"); err == nil {
-		fmt.Printf("Node: %s\n", node.Name())
-		fmt.Printf("Value: %s\n", node.Value())
-		fmt.Printf("Parent: %s\n", node.Parent().Name())
-		fmt.Printf("Children count: %d\n", len(node.Children()))
-	}
+	store.AddNode("customer2.location1", "customer2")
+
+	store.AddNode("customer2.location2", "customer2")
+	store.AddNode("customer2.location1.service1", "customer2.location1")
+
+	store.AddNode("customer2.location2.service1.logs", "customer2.location2.service1")
+	store.AddNode("AD.logs", "customer2.location2.service1.logs")
+	store.AddNode("AD.logs", "customer2.location2.service1.logs")
+	store.AddNode("AD.logs", "customer2.location2.service1.logs")
 
 	fmt.Println("--------------------------------")
 
