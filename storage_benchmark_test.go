@@ -27,54 +27,23 @@ const (
 	chunkSize = 100
 )
 
-// BenchmarkComplexNodeStructure benchmarks the creation of a complex node structure
-func BenchmarkComplexNodeStructure(b *testing.B) {
-	// Create a directory for the test. Not using a temp directory so we can reuse the
-	// test data for later benchmarks.
-	err := os.MkdirAll(directory, 0755)
-	if err != nil {
-		b.Fatalf("Failed to create temp directory: %v", err)
-	}
-	// defer os.RemoveAll(tempDir) // Clean up when done
-	dataDirName := fmt.Sprintf("data-chunck%v-nodes%v-subnodes%v-subsubnodes%v", chunkSize, numRootNodes, numSubNodesPerRoot, numSubSubNodesPerSubNode)
-	dataDir := filepath.Join(directory, dataDirName)
+func BenchmarkAddNodes(b *testing.B) {
+	dataDir, createDataDir := createDataDir(b)
 
-	var createDataDir bool
-	// Check if the data directory exists, and create it if it doesn't.
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			b.Fatalf("Failed to create data directory: %v", err)
-		}
-		createDataDir = true
-	}
-
-	// --------------------------
-	// Create a new store for each iteration
 	store, err := NewNodeStoreAdapter(dataDir, WithChunkSize(chunkSize))
 	if err != nil {
 		b.Fatalf("Failed to create store: %v", err)
 	}
 
-	if createDataDir {
-		addBenchmarkNodes(b, store)
-	}
-
 	defer func() {
-		// Close the store
 		if err := store.Close(); err != nil {
 			b.Fatalf("Failed to close store: %v", err)
 		}
 	}()
 
-	// defer func() {
-	// 	// Clean up data directory
-	// 	if err := os.RemoveAll(dataDir); err != nil {
-	// 		b.Fatalf("Failed to clean up data directory: %v", err)
-	// 	}
-	// 	if err := os.MkdirAll(dataDir, 0755); err != nil {
-	// 		b.Fatalf("Failed to recreate data directory: %v", err)
-	// 	}
-	// }()
+	if createDataDir {
+		addBenchmarkNodes(b, store)
+	}
 
 	// DEBUG: Open a file to write the node names
 	file, err := os.Create(filepath.Join(directory, "node-names.txt"))
@@ -83,10 +52,8 @@ func BenchmarkComplexNodeStructure(b *testing.B) {
 	}
 	defer file.Close()
 
-	// Reset timer before the actual benchmark starts
 	b.ResetTimer()
 
-	// Run the benchmark
 	for i := 0; i < b.N; i++ {
 		rnd := rand.Intn(numRootNodes)
 		nodeName := fmt.Sprintf("root-%d", rnd)
@@ -106,6 +73,29 @@ func BenchmarkComplexNodeStructure(b *testing.B) {
 		// 	b.Fatalf("Failed to write node name to file: %v", err)
 		// }
 	}
+}
+
+func createDataDir(b *testing.B) (string, bool) {
+	// Create a directory for the test. Not using a temp directory so we can reuse the
+	// test data for later benchmarks.
+	err := os.MkdirAll(directory, 0755)
+	if err != nil {
+		b.Fatalf("Failed to create temp directory: %v", err)
+	}
+	// defer os.RemoveAll(tempDir) // Clean up when done
+	dataDirName := fmt.Sprintf("data-chunck%v-nodes%v-subnodes%v-subsubnodes%v", chunkSize, numRootNodes, numSubNodesPerRoot, numSubSubNodesPerSubNode)
+	dataDir := filepath.Join(directory, dataDirName)
+
+	var createDataDir bool
+	// Check if the data directory exists, and create it if it doesn't.
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			b.Fatalf("Failed to create data directory: %v", err)
+		}
+		createDataDir = true
+	}
+
+	return dataDir, createDataDir
 }
 
 // addBenchmarkNodes adds the benchmark node structure to the store
