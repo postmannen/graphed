@@ -75,6 +75,102 @@ func BenchmarkAddNodes(b *testing.B) {
 	}
 }
 
+func BenchmarkTraverseNodesDown(b *testing.B) {
+	dataDir, createDataDir := createDataDir(b)
+
+	store, err := NewNodeStoreAdapter(dataDir, WithChunkSize(chunkSize))
+	if err != nil {
+		b.Fatalf("Failed to create store: %v", err)
+	}
+
+	defer func() {
+		if err := store.Close(); err != nil {
+			b.Fatalf("Failed to close store: %v", err)
+		}
+	}()
+
+	if createDataDir {
+		addBenchmarkNodes(b, store)
+	}
+
+	// DEBUG: Open a file to write the node names
+	file, err := os.Create(filepath.Join(directory, "node-names.txt"))
+	if err != nil {
+		b.Fatalf("Failed to create node names file: %v", err)
+	}
+	defer file.Close()
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		rnd := rand.Intn(numRootNodes)
+		nodeName := fmt.Sprintf("root-%d", rnd)
+
+		nd, err := store.Node(nodeName)
+		if err != nil {
+			log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
+		}
+
+		if nd.Name != nodeName {
+			log.Printf("Expected  node name to be %v, got '%s'\n", nodeName, nd.Name)
+		}
+
+		// DEBUG: Write the node name to the file
+		// _, err = file.WriteString(nodeName + " ")
+		// if err != nil {
+		// 	b.Fatalf("Failed to write node name to file: %v", err)
+		// }
+
+		toLookup := nodeName
+		ok := false
+		for {
+			toLookup, ok = benchmarkGetChild(toLookup, store)
+
+			// _, err = file.WriteString(toLookup + " ")
+			// if err != nil {
+			// 	b.Fatalf("Failed to write node name to file: %v", err)
+			// }
+
+			if !ok {
+				break
+			}
+		}
+
+		// _, err = file.WriteString("\n")
+		// if err != nil {
+		// 	b.Fatalf("Failed to write node name to file: %v", err)
+		// }
+
+	}
+}
+
+func benchmarkGetChild(nodeName string, store *NodeStoreAdapter) (string, bool) {
+	nd, err := store.Node(nodeName)
+	if err != nil {
+		log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
+	}
+
+	if nd.Name != nodeName {
+		log.Printf("Expected  node name to be %v, got '%s'\n", nodeName, nd.Name)
+	}
+
+	if len(nd.Children) == 0 {
+		return "", false
+	}
+
+	// Pick the first child, retrieve it by ID and return the name.
+	for childID := range nd.Children {
+		n, err := store.NodeByID(childID)
+		if err != nil {
+			log.Printf("Failed to retrieve node ID: %v : %v\n", nodeName, err)
+		}
+
+		return n.Name, true
+	}
+
+	return "", false
+}
+
 func createDataDir(b *testing.B) (string, bool) {
 	// Create a directory for the test. Not using a temp directory so we can reuse the
 	// test data for later benchmarks.

@@ -42,6 +42,11 @@ func (a *NodeStoreAdapter) Node(name string) (*Node, error) {
 	return a.persistentStore.Node(name)
 }
 
+// NodeByID retrieves a node by ID
+func (a *NodeStoreAdapter) NodeByID(id uuid.UUID) (*Node, error) {
+	return a.persistentStore.NodeByID(id)
+}
+
 // AddToValues adds a value to a node's values
 func (a *NodeStoreAdapter) AddToValues(name string, value []byte) error {
 	return a.persistentStore.AddToValues(name, value)

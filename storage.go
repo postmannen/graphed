@@ -485,10 +485,19 @@ func (p *PersistentNodeStore) Node(name string) (*Node, error) {
 		return nil, fmt.Errorf("node %s not found", name)
 	}
 
+	node, err := p.NodeByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("Node: node %s: %w", name, err)
+	}
+
+	return node, nil
+}
+
+func (p *PersistentNodeStore) NodeByID(id uuid.UUID) (*Node, error) {
 	// Get node location
 	location, exists := p.nodeToChunk[id]
 	if !exists {
-		return nil, fmt.Errorf("node %s location not found", name)
+		return nil, fmt.Errorf("getNodeByID: node %s location not found", id)
 	}
 
 	// Get chunk
@@ -498,7 +507,7 @@ func (p *PersistentNodeStore) Node(name string) (*Node, error) {
 		var err error
 		chunk, err = p.loadChunk(location.ChunkID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load chunk %d: %w", location.ChunkID, err)
+			return nil, fmt.Errorf("getNodeByID: failed to load chunk %d: %w", location.ChunkID, err)
 		}
 		p.chunks[location.ChunkID] = chunk
 	}
