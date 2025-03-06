@@ -79,6 +79,12 @@ type WALEntry struct {
 
 // NewPersistentNodeStore creates a new instance of PersistentNodeStore
 func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*PersistentNodeStore, error) {
+
+	// Create data directory if it doesn't exist
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
 	// Create default store
 	store := &PersistentNodeStore{
 		nodes:       make(map[uuid.UUID]*NodeMetadata),
@@ -547,6 +553,19 @@ func (p *PersistentNodeStore) NodeByID(id uuid.UUID) (*Node, error) {
 	return node, nil
 }
 
+// AllNodes returns all nodes in the store
+// Note: This returns metadata only, not the full nodes with values
+// TODO: Check if we need this!!!
+func (p *PersistentNodeStore) AllNodesMetadata() map[uuid.UUID]*Node {
+	// Load all nodes from disk
+	nodes, err := p.LoadAllNodes()
+	if err != nil {
+		// In case of error, return an empty map
+		return make(map[uuid.UUID]*Node)
+	}
+	return nodes
+}
+
 // AddToValues adds a value to a node's values
 func (p *PersistentNodeStore) AddToValues(name string, value []byte) error {
 	p.mu.Lock()
@@ -902,4 +921,17 @@ func (p *PersistentNodeStore) DebugInfo() map[string]interface{} {
 		"node_to_chunk_counts": nodeToChunkCounts,
 		"inconsistent_nodes":   inconsistentNodes,
 	}
+}
+
+// DefaultDataDir returns the default data directory for the persistent store
+func DefaultDataDir() (string, error) {
+	// Get user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	// Create default data directory path
+	dataDir := filepath.Join(homeDir, ".graphed")
+	return dataDir, nil
 }

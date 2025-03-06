@@ -30,7 +30,7 @@ const (
 func BenchmarkAddNodes(b *testing.B) {
 	dataDir, createDataDir := createDataDir(b)
 
-	store, err := NewNodeStoreAdapter(dataDir, WithChunkSize(chunkSize))
+	store, err := NewPersistentNodeStore(dataDir, WithChunkSize(chunkSize))
 	if err != nil {
 		b.Fatalf("Failed to create store: %v", err)
 	}
@@ -78,7 +78,7 @@ func BenchmarkAddNodes(b *testing.B) {
 func BenchmarkTraverseNodesDown(b *testing.B) {
 	dataDir, createDataDir := createDataDir(b)
 
-	store, err := NewNodeStoreAdapter(dataDir, WithChunkSize(chunkSize))
+	store, err := NewPersistentNodeStore(dataDir, WithChunkSize(chunkSize))
 	if err != nil {
 		b.Fatalf("Failed to create store: %v", err)
 	}
@@ -144,7 +144,7 @@ func BenchmarkTraverseNodesDown(b *testing.B) {
 	}
 }
 
-func benchmarkGetChild(nodeName string, store *NodeStoreAdapter) (string, bool) {
+func benchmarkGetChild(nodeName string, store *PersistentNodeStore) (string, bool) {
 	nd, err := store.Node(nodeName)
 	if err != nil {
 		log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
@@ -195,7 +195,7 @@ func createDataDir(b *testing.B) (string, bool) {
 }
 
 // addBenchmarkNodes adds the benchmark node structure to the store
-func addBenchmarkNodes(b *testing.B, store *NodeStoreAdapter) {
+func addBenchmarkNodes(b *testing.B, store *PersistentNodeStore) {
 	// Create a random source
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -250,7 +250,7 @@ func BenchmarkComplexNodeRetrieval(b *testing.B) {
 
 	b.StopTimer()
 	// Create a store and populate it with benchmark nodes
-	store, err := NewNodeStoreAdapter(dataDir, WithChunkSize(100))
+	store, err := NewPersistentNodeStore(dataDir, WithChunkSize(100))
 	if err != nil {
 		b.Fatalf("Failed to create store: %v", err)
 	}
