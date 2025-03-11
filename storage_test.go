@@ -174,7 +174,7 @@ func TestPersistentNodeStore(t *testing.T) {
 	// Test adapter
 	t.Run("Adapter", func(t *testing.T) {
 		// Create a new adapter
-		adapter, err := NewNodeStoreAdapter(dataDir)
+		adapter, err := NewPersistentNodeStore(dataDir)
 		if err != nil {
 			t.Fatalf("Failed to create adapter: %v", err)
 		}

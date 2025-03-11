@@ -27,7 +27,7 @@ func main() {
 	fmt.Printf("Using data directory: %s\n", dataDir)
 
 	// Create a persistent store with custom chunk size
-	store, err := graphed.NewNodeStoreAdapter(dataDir, graphed.WithChunkSize(5))
+	store, err := graphed.NewPersistentNodeStore(dataDir, graphed.WithChunkSize(5))
 	if err != nil {
 		log.Fatalf("Failed to create store: %v", err)
 	}
@@ -90,7 +90,7 @@ func main() {
 
 	// Reopen the store to demonstrate persistence
 	fmt.Println("\nReopening store to demonstrate persistence...")
-	store2, err := graphed.NewNodeStoreAdapter(dataDir)
+	store2, err := graphed.NewPersistentNodeStore(dataDir)
 	if err != nil {
 		log.Fatalf("Failed to reopen store: %v", err)
 	}
@@ -125,7 +125,10 @@ func main() {
 
 	// List all nodes
 	fmt.Println("\nListing all nodes:")
-	allNodes := store2.AllNodes()
+	allNodes, err := store2.LoadAllNodes()
+	if err != nil {
+		log.Fatalf("Failed to load all nodes: %v", err)
+	}
 	fmt.Printf("Total nodes: %d\n", len(allNodes))
 	for id, node := range allNodes {
 		fmt.Printf("Node ID: %s, Name: %s\n", id, node.Name)

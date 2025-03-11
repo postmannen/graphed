@@ -7,6 +7,13 @@ import (
 	"github.com/gofrs/uuid"
 )
 
+type Grapher interface {
+	AddNode(name string, parentName string) error
+	Node(name string) (*Node, error)
+	AllNodes() map[uuid.UUID]*Node
+	AddToValues(name string, value []byte) error
+}
+
 // Node in graph
 type Node struct {
 	ID   uuid.UUID `json:"id"`

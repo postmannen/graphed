@@ -79,6 +79,12 @@ type WALEntry struct {
 
 // NewPersistentNodeStore creates a new instance of PersistentNodeStore
 func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*PersistentNodeStore, error) {
+
+	// Create data directory if it doesn't exist
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
 	// Create default store
 	store := &PersistentNodeStore{
 		nodes:       make(map[uuid.UUID]*NodeMetadata),
@@ -215,7 +221,7 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	p.currentChunk.Modified = true
 
 	// Record location
-	offset, size, err := p.estimateNodeSize(newNode)
+	offset, size, err := p.nodeSize(newNode)
 	if err != nil {
 		p.currentChunk.mu.Unlock()
 		return fmt.Errorf("failed to estimate node size: %w", err)
@@ -254,15 +260,12 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 }
 
 // estimateNodeSize estimates the size of a node when serialized
-func (p *PersistentNodeStore) estimateNodeSize(node *Node) (int64, int64, error) {
-	// This is a simplistic implementation - in a real system you'd want to be more precise
+func (p *PersistentNodeStore) nodeSize(node *Node) (int64, int64, error) {
 	data, err := json.Marshal(node)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	// In a real implementation, you'd calculate the actual offset
-	// For now, we'll just use a placeholder
 	return 0, int64(len(data)), nil
 }
 
@@ -485,10 +488,19 @@ func (p *PersistentNodeStore) Node(name string) (*Node, error) {
 		return nil, fmt.Errorf("node %s not found", name)
 	}
 
+	node, err := p.NodeByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("Node: node %s: %w", name, err)
+	}
+
+	return node, nil
+}
+
+func (p *PersistentNodeStore) NodeByID(id uuid.UUID) (*Node, error) {
 	// Get node location
 	location, exists := p.nodeToChunk[id]
 	if !exists {
-		return nil, fmt.Errorf("node %s location not found", name)
+		return nil, fmt.Errorf("getNodeByID: node %s location not found", id)
 	}
 
 	// Get chunk
@@ -498,7 +510,7 @@ func (p *PersistentNodeStore) Node(name string) (*Node, error) {
 		var err error
 		chunk, err = p.loadChunk(location.ChunkID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load chunk %d: %w", location.ChunkID, err)
+			return nil, fmt.Errorf("getNodeByID: failed to load chunk %d: %w", location.ChunkID, err)
 		}
 		p.chunks[location.ChunkID] = chunk
 	}
@@ -536,6 +548,19 @@ func (p *PersistentNodeStore) Node(name string) (*Node, error) {
 	}
 
 	return node, nil
+}
+
+// AllNodes returns all nodes in the store
+// Note: This returns metadata only, not the full nodes with values
+// TODO: Check if we need this!!!
+func (p *PersistentNodeStore) AllNodesMetadata() map[uuid.UUID]*Node {
+	// Load all nodes from disk
+	nodes, err := p.LoadAllNodes()
+	if err != nil {
+		// In case of error, return an empty map
+		return make(map[uuid.UUID]*Node)
+	}
+	return nodes
 }
 
 // AddToValues adds a value to a node's values
@@ -784,7 +809,7 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 			p.nameToID[entry.Node.Name] = entry.NodeID
 
 			// Record location
-			offset, size, err := p.estimateNodeSize(entry.Node)
+			offset, size, err := p.nodeSize(entry.Node)
 			if err != nil {
 				return fmt.Errorf("failed to estimate node size: %w", err)
 			}
@@ -893,4 +918,17 @@ func (p *PersistentNodeStore) DebugInfo() map[string]interface{} {
 		"node_to_chunk_counts": nodeToChunkCounts,
 		"inconsistent_nodes":   inconsistentNodes,
 	}
+}
+
+// DefaultDataDir returns the default data directory for the persistent store
+func DefaultDataDir() (string, error) {
+	// Get user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	// Create default data directory path
+	dataDir := filepath.Join(homeDir, ".graphed")
+	return dataDir, nil
 }

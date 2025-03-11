@@ -83,3 +83,9 @@ Not sure if this makes sense, but a thing to check out further.
 ### Support for different storage backends, disk and memory
 
 Implemented, but should be refactored to to use the same function, and rather choose to have a storage interface as an argument.
+
+### Time
+
+- Time index?
+- Implement a dedicated time index/hashmap?
+- Time-bucket, query logs by day/hour ranges?

@@ -30,7 +30,7 @@ const (
 func BenchmarkAddNodes(b *testing.B) {
 	dataDir, createDataDir := createDataDir(b)
 
-	store, err := NewNodeStoreAdapter(dataDir, WithChunkSize(chunkSize))
+	store, err := NewPersistentNodeStore(dataDir, WithChunkSize(chunkSize))
 	if err != nil {
 		b.Fatalf("Failed to create store: %v", err)
 	}
@@ -75,6 +75,102 @@ func BenchmarkAddNodes(b *testing.B) {
 	}
 }
 
+func BenchmarkTraverseNodesDown(b *testing.B) {
+	dataDir, createDataDir := createDataDir(b)
+
+	store, err := NewPersistentNodeStore(dataDir, WithChunkSize(chunkSize))
+	if err != nil {
+		b.Fatalf("Failed to create store: %v", err)
+	}
+
+	defer func() {
+		if err := store.Close(); err != nil {
+			b.Fatalf("Failed to close store: %v", err)
+		}
+	}()
+
+	if createDataDir {
+		addBenchmarkNodes(b, store)
+	}
+
+	// DEBUG: Open a file to write the node names
+	file, err := os.Create(filepath.Join(directory, "node-names.txt"))
+	if err != nil {
+		b.Fatalf("Failed to create node names file: %v", err)
+	}
+	defer file.Close()
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		rnd := rand.Intn(numRootNodes)
+		nodeName := fmt.Sprintf("root-%d", rnd)
+
+		nd, err := store.Node(nodeName)
+		if err != nil {
+			log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
+		}
+
+		if nd.Name != nodeName {
+			log.Printf("Expected  node name to be %v, got '%s'\n", nodeName, nd.Name)
+		}
+
+		// DEBUG: Write the node name to the file
+		// _, err = file.WriteString(nodeName + " ")
+		// if err != nil {
+		// 	b.Fatalf("Failed to write node name to file: %v", err)
+		// }
+
+		toLookup := nodeName
+		ok := false
+		for {
+			toLookup, ok = benchmarkGetChild(toLookup, store)
+
+			// _, err = file.WriteString(toLookup + " ")
+			// if err != nil {
+			// 	b.Fatalf("Failed to write node name to file: %v", err)
+			// }
+
+			if !ok {
+				break
+			}
+		}
+
+		// _, err = file.WriteString("\n")
+		// if err != nil {
+		// 	b.Fatalf("Failed to write node name to file: %v", err)
+		// }
+
+	}
+}
+
+func benchmarkGetChild(nodeName string, store *PersistentNodeStore) (string, bool) {
+	nd, err := store.Node(nodeName)
+	if err != nil {
+		log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
+	}
+
+	if nd.Name != nodeName {
+		log.Printf("Expected  node name to be %v, got '%s'\n", nodeName, nd.Name)
+	}
+
+	if len(nd.Children) == 0 {
+		return "", false
+	}
+
+	// Pick the first child, retrieve it by ID and return the name.
+	for childID := range nd.Children {
+		n, err := store.NodeByID(childID)
+		if err != nil {
+			log.Printf("Failed to retrieve node ID: %v : %v\n", nodeName, err)
+		}
+
+		return n.Name, true
+	}
+
+	return "", false
+}
+
 func createDataDir(b *testing.B) (string, bool) {
 	// Create a directory for the test. Not using a temp directory so we can reuse the
 	// test data for later benchmarks.
@@ -99,7 +195,7 @@ func createDataDir(b *testing.B) (string, bool) {
 }
 
 // addBenchmarkNodes adds the benchmark node structure to the store
-func addBenchmarkNodes(b *testing.B, store *NodeStoreAdapter) {
+func addBenchmarkNodes(b *testing.B, store *PersistentNodeStore) {
 	// Create a random source
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -154,7 +250,7 @@ func BenchmarkComplexNodeRetrieval(b *testing.B) {
 
 	b.StopTimer()
 	// Create a store and populate it with benchmark nodes
-	store, err := NewNodeStoreAdapter(dataDir, WithChunkSize(100))
+	store, err := NewPersistentNodeStore(dataDir, WithChunkSize(100))
 	if err != nil {
 		b.Fatalf("Failed to create store: %v", err)
 	}
