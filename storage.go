@@ -25,9 +25,17 @@ type ChunkLocation struct {
 
 // NodeMetadata contains the lightweight information about the nodes in memory.
 type NodeMetadata struct {
-	ID       uuid.UUID              `json:"id"`
-	Parent   uuid.UUID              `json:"parent,omitempty"`
-	Children map[uuid.UUID]struct{} `json:"children,omitempty"`
+	ID       uuid.UUID                         `json:"id"`
+	Parent   map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
+	Children map[uuid.UUID]struct{}            `json:"children,omitempty"`
+}
+
+func newNodeMetadata(id uuid.UUID) *NodeMetadata {
+	return &NodeMetadata{
+		ID:       id,
+		Parent:   make(map[string]map[uuid.UUID]struct{}),
+		Children: make(map[uuid.UUID]struct{}),
+	}
 }
 
 // PersistentNodeStore extends the in-memory NodeStore with disk persistence.
@@ -109,7 +117,7 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 	// Initialize WAL
 	wal, err := newWriteAheadLog(dataDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize WAL: %w", err)
+		return nil, fmt.Errorf("NewPersistentNodeStore: failed to initialize WAL: %w", err)
 	}
 	store.wal = wal
 
@@ -124,12 +132,12 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 
 	// Load existing data if any
 	if err := store.loadMetadata(); err != nil {
-		return nil, fmt.Errorf("failed to load metadata: %w", err)
+		return nil, fmt.Errorf("NewPersistentNodeStore: failed to load metadata: %w", err)
 	}
 
 	// Recover from WAL if needed
 	if err := store.RecoverFromWAL(); err != nil {
-		return nil, fmt.Errorf("failed to recover from WAL: %w", err)
+		return nil, fmt.Errorf("NewPersistentNodeStore: failed to recover from WAL: %w", err)
 	}
 
 	return store, nil
@@ -152,7 +160,7 @@ func newWriteAheadLog(dataDir string) (*WriteAheadLog, error) {
 	walPath := filepath.Join(dataDir, "wal.log")
 	file, err := os.OpenFile(walPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open WAL file: %w", err)
+		return nil, fmt.Errorf("newWriteAheadLog: failed to open WAL file: %w", err)
 	}
 
 	return &WriteAheadLog{
@@ -169,23 +177,14 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	// Generate UUID
 	id, err := uuid.NewV7()
 	if err != nil {
-		return fmt.Errorf("failed to generate UUID: %w", err)
+		return fmt.Errorf("AddNode: failed to generate UUID: %w", err)
 	}
 
 	// Create new node
-	newNode := &Node{
-		ID:        id,
-		Name:      name,
-		Timestamp: time.Now(),
-		Values:    make([][]byte, 0),
-		Children:  make(map[uuid.UUID]struct{}),
-	}
+	newNode := newNode(name, id)
 
 	// Create metadata
-	metadata := &NodeMetadata{
-		ID:       id,
-		Children: make(map[uuid.UUID]struct{}),
-	}
+	metadata := newNodeMetadata(id)
 
 	// Handle parent relationship
 	var parentID uuid.UUID
@@ -202,17 +201,19 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 
 		// Update parent node in storage
 		if err := p.updateNodeInStorage(parentID); err != nil {
-			return fmt.Errorf("failed to update parent node: %w", err)
+			return fmt.Errorf("AddNode: failed to update parent node: %w", err)
 		}
 
 		// Set parent in new node
-		newNode.Parent = parentID
-		metadata.Parent = parentID
+		m := make(map[uuid.UUID]struct{})
+		m[parentID] = struct{}{}
+		newNode.Parent["relationship"] = m
+		metadata.Parent["relationship"] = m
 	}
 
 	// Add to WAL
 	if err := p.wal.LogAddNode(newNode); err != nil {
-		return fmt.Errorf("failed to log node addition: %w", err)
+		return fmt.Errorf("AddNode: failed to log node addition: %w", err)
 	}
 
 	// Add to current chunk
@@ -224,7 +225,7 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	offset, size, err := p.nodeSize(newNode)
 	if err != nil {
 		p.currentChunk.mu.Unlock()
-		return fmt.Errorf("failed to estimate node size: %w", err)
+		return fmt.Errorf("AddNode: failed to estimate node size: %w", err)
 	}
 
 	location := ChunkLocation{
@@ -243,7 +244,7 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	if len(p.currentChunk.Nodes) >= p.chunkSize {
 		// Flush current chunk to disk
 		if err := p.flushChunk(p.currentChunk.ID); err != nil {
-			return fmt.Errorf("failed to flush chunk: %w", err)
+			return fmt.Errorf("AddNode: failed to flush chunk: %w", err)
 		}
 
 		// Create new chunk
@@ -263,7 +264,7 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 func (p *PersistentNodeStore) nodeSize(node *Node) (int64, int64, error) {
 	data, err := json.Marshal(node)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("nodeSize: failed to marshal node: %w", err)
 	}
 
 	return 0, int64(len(data)), nil
@@ -274,7 +275,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 	// Find the chunk containing this node
 	location, exists := p.nodeToChunk[id]
 	if !exists {
-		return fmt.Errorf("node %s not found in chunk mapping", id)
+		return fmt.Errorf("updateNodeInStorage: node %s not found in chunk mapping", id)
 	}
 
 	// Get the chunk
@@ -284,7 +285,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 		var err error
 		chunk, err = p.loadChunk(location.ChunkID)
 		if err != nil {
-			return fmt.Errorf("failed to load chunk %d: %w", location.ChunkID, err)
+			return fmt.Errorf("updateNodeInStorage: failed to load chunk %d: %w", location.ChunkID, err)
 		}
 		p.chunks[location.ChunkID] = chunk
 	}
@@ -292,7 +293,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 	// Get the full node
 	node, err := p.getNodeFromChunk(id, chunk)
 	if err != nil {
-		return fmt.Errorf("failed to get node from chunk: %w", err)
+		return fmt.Errorf("updateNodeInStorage: failed to get node from chunk: %w", err)
 	}
 
 	// Update the node's metadata from memory
@@ -306,7 +307,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 
 	// Log the update
 	if err := p.wal.LogUpdateNode(node); err != nil {
-		return fmt.Errorf("failed to log node update: %w", err)
+		return fmt.Errorf("updateNodeInStorage: failed to log node update: %w", err)
 	}
 
 	return nil
@@ -319,7 +320,7 @@ func (p *PersistentNodeStore) getNodeFromChunk(id uuid.UUID, chunk *Chunk) (*Nod
 
 	node, exists := chunk.Nodes[id]
 	if !exists {
-		return nil, fmt.Errorf("node %s not found in chunk %d", id, chunk.ID)
+		return nil, fmt.Errorf("getNodeFromChunk: node %s not found in chunk %d", id, chunk.ID)
 	}
 
 	return node, nil
@@ -331,19 +332,19 @@ func (p *PersistentNodeStore) loadChunk(chunkID int) (*Chunk, error) {
 
 	// Check if file exists
 	if _, err := os.Stat(chunkPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("chunk file %s does not exist", chunkPath)
+		return nil, fmt.Errorf("loadChunk: chunk file %s does not exist", chunkPath)
 	}
 
 	// Read file
 	data, err := os.ReadFile(chunkPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read chunk file: %w", err)
+		return nil, fmt.Errorf("loadChunk: failed to read chunk file: %w", err)
 	}
 
 	// Unmarshal
 	var chunk Chunk
 	if err := json.Unmarshal(data, &chunk); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal chunk: %w", err)
+		return nil, fmt.Errorf("loadChunk: failed to unmarshal chunk: %w", err)
 	}
 
 	// Ensure the chunk ID is set correctly
@@ -357,7 +358,7 @@ func (p *PersistentNodeStore) loadChunk(chunkID int) (*Chunk, error) {
 func (ps *PersistentNodeStore) flushChunk(chunkID int) error {
 	chunk, exists := ps.chunks[chunkID]
 	if !exists {
-		return fmt.Errorf("chunk %d not found", chunkID)
+		return fmt.Errorf("flushChunk: chunk %d not found", chunkID)
 	}
 
 	chunk.mu.RLock()
@@ -371,13 +372,13 @@ func (ps *PersistentNodeStore) flushChunk(chunkID int) error {
 	// Marshal to JSON
 	data, err := json.Marshal(chunk)
 	if err != nil {
-		return fmt.Errorf("failed to marshal chunk: %w", err)
+		return fmt.Errorf("flushChunk: failed to marshal chunk: %w", err)
 	}
 
 	// Write to file
 	chunkPath := filepath.Join(ps.dataDir, fmt.Sprintf("chunk_%d.json", chunkID))
 	if err := os.WriteFile(chunkPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write chunk file: %w", err)
+		return fmt.Errorf("flushChunk: failed to write chunk file: %w", err)
 	}
 
 	// Mark as not modified
@@ -393,13 +394,13 @@ func (p *PersistentNodeStore) FlushAll() error {
 
 	for chunkID := range p.chunks {
 		if err := p.flushChunk(chunkID); err != nil {
-			return fmt.Errorf("failed to flush chunk %d: %w", chunkID, err)
+			return fmt.Errorf("FlushAll: failed to flush chunk %d: %w", chunkID, err)
 		}
 	}
 
 	// Save metadata
 	if err := p.saveMetadata(); err != nil {
-		return fmt.Errorf("failed to save metadata: %w", err)
+		return fmt.Errorf("FlushAll: failed to save metadata: %w", err)
 	}
 
 	return nil
@@ -425,7 +426,7 @@ func (p *PersistentNodeStore) saveMetadata() error {
 	// Marshal to JSON
 	data, err := json.Marshal(metadata)
 	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
+		return fmt.Errorf("saveMetadata: failed to marshal metadata: %w", err)
 	}
 
 	// Write to file
@@ -461,7 +462,7 @@ func (p *PersistentNodeStore) loadMetadata() error {
 	}
 
 	if err := json.Unmarshal(data, &metadata); err != nil {
-		return fmt.Errorf("failed to unmarshal metadata: %w", err)
+		return fmt.Errorf("loadMetadata: failed to unmarshal metadata: %w", err)
 	}
 
 	// Apply metadata
@@ -479,18 +480,18 @@ func (p *PersistentNodeStore) GetNodeByName(name string) (*Node, error) {
 	defer p.mu.RUnlock()
 
 	if name == "" {
-		return nil, fmt.Errorf("node name is empty")
+		return nil, fmt.Errorf("GetNodeByName: node name is empty")
 	}
 
 	// Get node ID
 	id, exists := p.nameToID[name]
 	if !exists {
-		return nil, fmt.Errorf("node %s not found", name)
+		return nil, fmt.Errorf("GetNodeByName: node %s not found", name)
 	}
 
 	node, err := p.GetNodeByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("Node: node %s: %w", name, err)
+		return nil, fmt.Errorf("GetNodeByName: node %s: %w", name, err)
 	}
 
 	return node, nil
@@ -544,17 +545,17 @@ func (p *PersistentNodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
 		}
 
 		// If we still can't find it, return the original error
-		return nil, fmt.Errorf("failed to get node from chunk: %w", err)
+		return nil, fmt.Errorf("getNodeByID: failed to get node from chunk: %w", err)
 	}
 
 	return node, nil
 }
 
-// GetNodeChildren retrieves the children of a node
-func (p *PersistentNodeStore) GetNodeChildren(name string) ([]*Node, error) {
+// GetAllChildNodes retrieves all child nodes of a node.
+func (p *PersistentNodeStore) GetAllChildNodes(name string) ([]*Node, error) {
 	n, err := p.GetNodeByName(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetAllChildNodes: %w", err)
 	}
 
 	children := make([]*Node, 0, len(n.Children))
@@ -562,7 +563,7 @@ func (p *PersistentNodeStore) GetNodeChildren(name string) ([]*Node, error) {
 	for childID := range n.Children {
 		child, err := p.GetNodeByID(childID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("GetAllChildNodes: %w", err)
 		}
 		children = append(children, child)
 	}
@@ -571,18 +572,23 @@ func (p *PersistentNodeStore) GetNodeChildren(name string) ([]*Node, error) {
 }
 
 // GetNodeParent retrieves the parent of a node
-func (p *PersistentNodeStore) GetNodeParent(name string) (*Node, error) {
+func (p *PersistentNodeStore) GetNodeParents(name string) ([]*Node, error) {
 	n, err := p.GetNodeByName(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetNodeParents: %w", err)
 	}
 
-	parent, err := p.GetNodeByID(n.Parent)
-	if err != nil {
-		return nil, err
+	parents := make([]*Node, 0, len(n.Parent))
+
+	for parentID := range n.Parent["relationship"] {
+		parent, err := p.GetNodeByID(parentID)
+		if err != nil {
+			return nil, fmt.Errorf("GetNodeParents: %w", err)
+		}
+		parents = append(parents, parent)
 	}
 
-	return parent, nil
+	return parents, nil
 }
 
 // AllNodes returns all nodes in the store
@@ -606,13 +612,13 @@ func (p *PersistentNodeStore) AddToValues(name string, value []byte) error {
 	// Get node ID
 	id, exists := p.nameToID[name]
 	if !exists {
-		return fmt.Errorf("node %s not found", name)
+		return fmt.Errorf("AddToValues: node %s not found", name)
 	}
 
 	// Get node location
 	location, exists := p.nodeToChunk[id]
 	if !exists {
-		return fmt.Errorf("node %s location not found", name)
+		return fmt.Errorf("AddToValues: node %s location not found", name)
 	}
 
 	// Get chunk
@@ -622,7 +628,7 @@ func (p *PersistentNodeStore) AddToValues(name string, value []byte) error {
 		var err error
 		chunk, err = p.loadChunk(location.ChunkID)
 		if err != nil {
-			return fmt.Errorf("failed to load chunk %d: %w", location.ChunkID, err)
+			return fmt.Errorf("AddToValues: failed to load chunk %d: %w", location.ChunkID, err)
 		}
 		p.chunks[location.ChunkID] = chunk
 	}
@@ -630,7 +636,7 @@ func (p *PersistentNodeStore) AddToValues(name string, value []byte) error {
 	// Get node from chunk
 	node, err := p.getNodeFromChunk(id, chunk)
 	if err != nil {
-		return fmt.Errorf("failed to get node from chunk: %w", err)
+		return fmt.Errorf("AddToValues: failed to get node from chunk: %w", err)
 	}
 
 	// Add value
@@ -643,7 +649,7 @@ func (p *PersistentNodeStore) AddToValues(name string, value []byte) error {
 
 	// Log the update
 	if err := p.wal.LogUpdateNode(node); err != nil {
-		return fmt.Errorf("failed to log node update: %w", err)
+		return fmt.Errorf("AddToValues: failed to log node update: %w", err)
 	}
 
 	return nil
@@ -684,7 +690,7 @@ func (w *WriteAheadLog) writeEntry(entry WALEntry) error {
 	// Marshal entry
 	data, err := json.Marshal(entry)
 	if err != nil {
-		return fmt.Errorf("failed to marshal WAL entry: %w", err)
+		return fmt.Errorf("writeEntry: failed to marshal WAL entry: %w", err)
 	}
 
 	// Write length prefix
@@ -692,17 +698,17 @@ func (w *WriteAheadLog) writeEntry(entry WALEntry) error {
 	binary.LittleEndian.PutUint64(lenBuf, uint64(len(data)))
 
 	if _, err := w.file.Write(lenBuf); err != nil {
-		return fmt.Errorf("failed to write entry length: %w", err)
+		return fmt.Errorf("writeEntry: failed to write entry length: %w", err)
 	}
 
 	// Write data
 	if _, err := w.file.Write(data); err != nil {
-		return fmt.Errorf("failed to write entry data: %w", err)
+		return fmt.Errorf("writeEntry: failed to write entry data: %w", err)
 	}
 
 	// Sync to disk
 	if err := w.file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync WAL: %w", err)
+		return fmt.Errorf("writeEntry: failed to sync WAL: %w", err)
 	}
 
 	return nil
@@ -712,12 +718,12 @@ func (w *WriteAheadLog) writeEntry(entry WALEntry) error {
 func (p *PersistentNodeStore) Close() error {
 	// Flush all chunks
 	if err := p.FlushAll(); err != nil {
-		return fmt.Errorf("failed to flush all chunks: %w", err)
+		return fmt.Errorf("Close: failed to flush all chunks: %w", err)
 	}
 
 	// Close WAL
 	if err := p.wal.file.Close(); err != nil {
-		return fmt.Errorf("failed to close WAL: %w", err)
+		return fmt.Errorf("Close: failed to close WAL: %w", err)
 	}
 
 	return nil
@@ -749,7 +755,7 @@ func (p *PersistentNodeStore) LoadAllNodes() (map[uuid.UUID]*Node, error) {
 			var err error
 			chunk, err = p.loadChunk(location.ChunkID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to load chunk %d: %w", location.ChunkID, err)
+				return nil, fmt.Errorf("LoadAllNodes: failed to load chunk %d: %w", location.ChunkID, err)
 			}
 			p.chunks[location.ChunkID] = chunk
 		}
@@ -757,7 +763,7 @@ func (p *PersistentNodeStore) LoadAllNodes() (map[uuid.UUID]*Node, error) {
 		// Get node from chunk
 		node, err := p.getNodeFromChunk(id, chunk)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get node %s: %w", id, err)
+			return nil, fmt.Errorf("LoadAllNodes: failed to get node %s: %w", id, err)
 		}
 
 		result[id] = node
@@ -784,7 +790,7 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 	// Open WAL for reading
 	file, err := os.Open(walPath)
 	if err != nil {
-		return fmt.Errorf("failed to open WAL for recovery: %w", err)
+		return fmt.Errorf("RecoverFromWAL: failed to open WAL for recovery: %w", err)
 	}
 	defer file.Close()
 
@@ -797,7 +803,7 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 			break // End of file
 		}
 		if err != nil {
-			return fmt.Errorf("failed to read entry length: %w", err)
+			return fmt.Errorf("RecoverFromWAL: failed to read entry length: %w", err)
 		}
 
 		// Get prefix length value
@@ -807,13 +813,13 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 		entryData := make([]byte, prefixLen)
 		_, err = io.ReadFull(file, entryData)
 		if err != nil {
-			return fmt.Errorf("failed to read entry data: %w", err)
+			return fmt.Errorf("RecoverFromWAL: failed to read entry data: %w", err)
 		}
 
 		// Unmarshal the data entry.
 		var entry WALEntry
 		if err := json.Unmarshal(entryData, &entry); err != nil {
-			return fmt.Errorf("failed to unmarshal WAL entry: %w", err)
+			return fmt.Errorf("RecoverFromWAL: failed to unmarshal WAL entry: %w", err)
 		}
 
 		// Apply the data entry.
@@ -846,7 +852,7 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 			// Record location
 			offset, size, err := p.nodeSize(entry.Node)
 			if err != nil {
-				return fmt.Errorf("failed to estimate node size: %w", err)
+				return fmt.Errorf("RecoverFromWAL: failed to estimate node size: %w", err)
 			}
 
 			p.nodeToChunk[entry.NodeID] = ChunkLocation{
@@ -859,7 +865,7 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 			// Find the chunk containing this node from the nodeToChunk map.
 			location, exists := p.nodeToChunk[entry.NodeID]
 			if !exists {
-				return fmt.Errorf("node %s not found in chunk mapping during recovery", entry.NodeID)
+				return fmt.Errorf("RecoverFromWAL: node %s not found in chunk mapping during recovery", entry.NodeID)
 			}
 
 			// Get or load the chunk
@@ -960,7 +966,7 @@ func DefaultDataDir() (string, error) {
 	// Get user's home directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to get user home directory: %w", err)
+		return "", fmt.Errorf("DefaultDataDir: failed to get user home directory: %w", err)
 	}
 
 	// Create default data directory path

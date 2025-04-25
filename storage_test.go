@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/gofrs/uuid"
 )
 
 func TestPersistentNodeStore(t *testing.T) {
@@ -48,8 +46,20 @@ func TestPersistentNodeStore(t *testing.T) {
 		}
 
 		// Check the child node's parent
-		if child.Parent == uuid.Nil {
-			t.Fatalf("Child node's parent is nil")
+		r, ok := child.Parent["relationship"]
+		if !ok {
+			t.Fatalf("Child node's parent relationship is not set")
+		}
+
+		root, err := store.GetNodeByName("root")
+		if err != nil {
+			t.Fatalf("Failed to retrieve root node: %v", err)
+		}
+
+		for parentID := range r {
+			if parentID != root.ID {
+				t.Fatalf("Child node's parent is not set")
+			}
 		}
 
 		// Add a value to the child node

@@ -7,12 +7,12 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-type Grapher interface {
-	AddNode(name string, parentName string) error
-	Node(name string) (*Node, error)
-	AllNodes() map[uuid.UUID]*Node
-	AddToValues(name string, value []byte) error
-}
+//type Grapher interface {
+//	AddNode(name string, parentName string) error
+//	Node(name string) (*Node, error)
+//	AllNodes() map[uuid.UUID]*Node
+//	AddToValues(name string, value []byte) error
+//}
 
 // Node in graph
 type Node struct {
@@ -23,8 +23,8 @@ type Node struct {
 	// Single value. Ex. single log line.
 	Value []byte `json:"value"`
 	// multiple values. Ex. multiple log lines.
-	Values [][]byte  `json:"values"`
-	Parent uuid.UUID `json:"parent,omitempty"`
+	Values [][]byte                          `json:"values"`
+	Parent map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
 	// HERE !!!!!!!!!!!!
 	Children map[uuid.UUID]struct{} `json:"children,omitempty"`
 }
@@ -56,9 +56,22 @@ func (ns *NodeStore) AddToValues(name string, value []byte) error {
 	return nil
 }
 
+func newNode(name string, id uuid.UUID) *Node {
+	n := Node{
+		ID:       id,
+		Name:     name,
+		Values:   make([][]byte, 0),
+		Parent:   make(map[string]map[uuid.UUID]struct{}),
+		Children: make(map[uuid.UUID]struct{}),
+	}
+
+	return &n
+}
+
 // AddNode adds a new node to the store
 //
 // TODO: Add AddValue method to add a value to the node
+// TODO: Using single parent in function arguments for now. Replace with slice later. Also add a parent relationship type.
 func (ns *NodeStore) AddNode(name string, parentName string) error {
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -69,15 +82,11 @@ func (ns *NodeStore) AddNode(name string, parentName string) error {
 	ns.nameToId[name] = id
 
 	// Create new node
-	newNode := &Node{
-		ID:       id,
-		Name:     name,
-		Values:   make([][]byte, 0),
-		Children: make(map[uuid.UUID]struct{}),
-	}
+	newNode := newNode(name, id)
 
 	var parentId uuid.UUID
 	var parentExists bool
+
 	if parentName != "" {
 		parentId, parentExists = ns.nameToId[parentName]
 	}
@@ -89,8 +98,10 @@ func (ns *NodeStore) AddNode(name string, parentName string) error {
 
 		parent.Children[id] = struct{}{}
 
-		// Set the parent of the new node
-		newNode.Parent = parentId
+		// Set the parent of the newNode
+		m := make(map[uuid.UUID]struct{})
+		m[parentId] = struct{}{}
+		newNode.Parent["relationship"] = m
 	}
 
 	// Add node to store

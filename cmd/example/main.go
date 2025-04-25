@@ -131,7 +131,7 @@ func main() {
 	}
 	fmt.Printf("Total nodes: %d\n", len(allNodes))
 	for id, node := range allNodes {
-		fmt.Printf("Node ID: %s, Name: %s\n", id, node.Name)
+		fmt.Printf("Node ID: %s, Name: %s, Parents: %v, Children: %v\n", id, node.Name, node.Parent, node.Children)
 		if len(node.Values) > 0 {
 			fmt.Printf("    Node values: %s\n", node.Values[0])
 		}
