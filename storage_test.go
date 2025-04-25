@@ -42,7 +42,7 @@ func TestPersistentNodeStore(t *testing.T) {
 		}
 
 		// Retrieve the child node
-		child, err := store.Node("child")
+		child, err := store.GetNodeByName("child")
 		if err != nil {
 			t.Fatalf("Failed to retrieve child node: %v", err)
 		}
@@ -58,7 +58,7 @@ func TestPersistentNodeStore(t *testing.T) {
 		}
 
 		// Retrieve the child node again
-		child, err = store.Node("child")
+		child, err = store.GetNodeByName("child")
 		if err != nil {
 			t.Fatalf("Failed to retrieve child node after adding value: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestPersistentNodeStore(t *testing.T) {
 		defer store2.Close()
 
 		// Retrieve the node
-		node, err := store2.Node("persistent")
+		node, err := store2.GetNodeByName("persistent")
 		if err != nil {
 			t.Fatalf("Failed to retrieve node from second store: %v", err)
 		}
@@ -164,7 +164,7 @@ func TestPersistentNodeStore(t *testing.T) {
 		// Verify we can still retrieve all nodes
 		for i := 0; i < 10; i++ {
 			nodeName := "chunking-child-" + string(rune('a'+i))
-			_, err := store.Node(nodeName)
+			_, err := store.GetNodeByName(nodeName)
 			if err != nil {
 				t.Fatalf("Failed to retrieve node %s: %v", nodeName, err)
 			}
@@ -186,7 +186,7 @@ func TestPersistentNodeStore(t *testing.T) {
 		}
 
 		// Retrieve the node
-		node, err := adapter.Node("adapter-node")
+		node, err := adapter.GetNodeByName("adapter-node")
 		if err != nil {
 			t.Fatalf("Failed to retrieve node through adapter: %v", err)
 		}
@@ -201,7 +201,7 @@ func TestPersistentNodeStore(t *testing.T) {
 		}
 
 		// Retrieve the node again
-		node, err = adapter.Node("adapter-node")
+		node, err = adapter.GetNodeByName("adapter-node")
 		if err != nil {
 			t.Fatalf("Failed to retrieve node after adding value: %v", err)
 		}

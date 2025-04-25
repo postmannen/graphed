@@ -473,8 +473,8 @@ func (p *PersistentNodeStore) loadMetadata() error {
 	return nil
 }
 
-// Node retrieves a node by name
-func (p *PersistentNodeStore) Node(name string) (*Node, error) {
+// GetNodeByName retrieves a node by name
+func (p *PersistentNodeStore) GetNodeByName(name string) (*Node, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -488,7 +488,7 @@ func (p *PersistentNodeStore) Node(name string) (*Node, error) {
 		return nil, fmt.Errorf("node %s not found", name)
 	}
 
-	node, err := p.NodeByID(id)
+	node, err := p.GetNodeByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("Node: node %s: %w", name, err)
 	}
@@ -496,7 +496,7 @@ func (p *PersistentNodeStore) Node(name string) (*Node, error) {
 	return node, nil
 }
 
-func (p *PersistentNodeStore) NodeByID(id uuid.UUID) (*Node, error) {
+func (p *PersistentNodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
 	// Get node location
 	location, exists := p.nodeToChunk[id]
 	if !exists {

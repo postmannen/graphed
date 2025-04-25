@@ -58,7 +58,7 @@ func BenchmarkAddNodes(b *testing.B) {
 		rnd := rand.Intn(numRootNodes)
 		nodeName := fmt.Sprintf("root-%d", rnd)
 
-		nd, err := store.Node(nodeName)
+		nd, err := store.GetNodeByName(nodeName)
 		if err != nil {
 			log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
 		}
@@ -106,7 +106,7 @@ func BenchmarkTraverseNodesDown(b *testing.B) {
 		rnd := rand.Intn(numRootNodes)
 		nodeName := fmt.Sprintf("root-%d", rnd)
 
-		nd, err := store.Node(nodeName)
+		nd, err := store.GetNodeByName(nodeName)
 		if err != nil {
 			log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
 		}
@@ -145,7 +145,7 @@ func BenchmarkTraverseNodesDown(b *testing.B) {
 }
 
 func benchmarkGetChild(nodeName string, store *PersistentNodeStore) (string, bool) {
-	nd, err := store.Node(nodeName)
+	nd, err := store.GetNodeByName(nodeName)
 	if err != nil {
 		log.Printf("Failed to retrieve node: %v : %v\n", nodeName, err)
 	}
@@ -160,7 +160,7 @@ func benchmarkGetChild(nodeName string, store *PersistentNodeStore) (string, boo
 
 	// Pick the first child, retrieve it by ID and return the name.
 	for childID := range nd.Children {
-		n, err := store.NodeByID(childID)
+		n, err := store.GetNodeByID(childID)
 		if err != nil {
 			log.Printf("Failed to retrieve node ID: %v : %v\n", nodeName, err)
 		}
@@ -273,7 +273,7 @@ func BenchmarkComplexNodeRetrieval(b *testing.B) {
 		rootName := fmt.Sprintf("root-%d", rootIdx)
 
 		// Retrieve the root node
-		_, err := store.Node(rootName)
+		_, err := store.GetNodeByName(rootName)
 		if err != nil {
 			b.Fatalf("Failed to retrieve root node %s: %v", rootName, err)
 		}
@@ -283,7 +283,7 @@ func BenchmarkComplexNodeRetrieval(b *testing.B) {
 		subNodeName := fmt.Sprintf("%s-sub-%d", rootName, subIdx)
 
 		// Retrieve the subnode
-		_, err = store.Node(subNodeName)
+		_, err = store.GetNodeByName(subNodeName)
 		if err != nil {
 			b.Fatalf("Failed to retrieve subnode %s: %v", subNodeName, err)
 		}
@@ -293,7 +293,7 @@ func BenchmarkComplexNodeRetrieval(b *testing.B) {
 		subSubNodeName := fmt.Sprintf("%s-subsub-%d", subNodeName, subSubIdx)
 
 		// Retrieve the subsubnode
-		subSubNode, err := store.Node(subSubNodeName)
+		subSubNode, err := store.GetNodeByName(subSubNodeName)
 		if err != nil {
 			b.Fatalf("Failed to retrieve subsubnode %s: %v", subSubNodeName, err)
 		}

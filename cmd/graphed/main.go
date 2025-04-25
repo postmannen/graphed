@@ -38,7 +38,16 @@ func main() {
 
 	fmt.Println("--------------------------------")
 
-	// Marshal the entire store to JSON
+	// Get a single node.
+	node, err := store.Node("customer2.location2.service1.logs")
+	if err != nil {
+		log.Fatalf("Error getting node: %v\n", err)
+	}
+	fmt.Printf("Node: %+v\n", node)
+
+	fmt.Println("--------------------------------")
+
+	// Marshal the entire store to JSON.
 	jsonData, err := json.MarshalIndent(store.AllNodes(), "", "    ")
 	if err != nil {
 		log.Fatalf("Error marshaling to JSON: %v\n", err)

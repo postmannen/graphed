@@ -68,7 +68,7 @@ func main() {
 
 	// Retrieve a node
 	fmt.Println("Retrieving a node...")
-	node, err := store.Node("customer1")
+	node, err := store.GetNodeByName("customer1")
 	if err != nil {
 		log.Fatalf("Failed to retrieve customer1 node: %v", err)
 	}
@@ -104,7 +104,7 @@ func main() {
 
 	// Retrieve the same node again
 	fmt.Println("\nRetrieving the same node again...")
-	node2, err := store2.Node("customer1")
+	node2, err := store2.GetNodeByName("customer1")
 	if err != nil {
 		log.Printf("Error retrieving customer1 node after reopening: %v", err)
 
@@ -114,7 +114,7 @@ func main() {
 		fmt.Printf("Total nodes in metadata: %d\n", len(allNodes))
 
 		// Try again after loading all nodes
-		node2, err = store2.Node("customer1")
+		node2, err = store2.GetNodeByName("customer1")
 		if err != nil {
 			log.Fatalf("Failed to retrieve customer1 node after recovery attempt: %v", err)
 		}
