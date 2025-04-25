@@ -550,6 +550,41 @@ func (p *PersistentNodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
 	return node, nil
 }
 
+// GetNodeChildren retrieves the children of a node
+func (p *PersistentNodeStore) GetNodeChildren(name string) ([]*Node, error) {
+	n, err := p.GetNodeByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	children := make([]*Node, 0, len(n.Children))
+
+	for childID := range n.Children {
+		child, err := p.GetNodeByID(childID)
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, child)
+	}
+
+	return children, nil
+}
+
+// GetNodeParent retrieves the parent of a node
+func (p *PersistentNodeStore) GetNodeParent(name string) (*Node, error) {
+	n, err := p.GetNodeByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	parent, err := p.GetNodeByID(n.Parent)
+	if err != nil {
+		return nil, err
+	}
+
+	return parent, nil
+}
+
 // AllNodes returns all nodes in the store
 // Note: This returns metadata only, not the full nodes with values
 // TODO: Check if we need this!!!
