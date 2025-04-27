@@ -13,7 +13,7 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// ChunkSize defines how many nodes are stored in a single chunk file
+// ChunkSize, how many nodes are stored in a single chunk file
 const DefaultChunkSize = 100
 
 // ChunkLocation represents where a node is stored on disk
@@ -23,7 +23,7 @@ type ChunkLocation struct {
 	Size    int64 `json:"size"`
 }
 
-// NodeMetadata contains the lightweight information about the nodes in memory.
+// NodeMetadata to use with in-memory lookup.
 type NodeMetadata struct {
 	ID       uuid.UUID                         `json:"id"`
 	Parent   map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
@@ -38,28 +38,21 @@ func newNodeMetadata(id uuid.UUID) *NodeMetadata {
 	}
 }
 
-// PersistentNodeStore extends the in-memory NodeStore with disk persistence.
+// PersistentNodeStore, NodeStore with disk persistence.
 type PersistentNodeStore struct {
-	// In-memory indexes
-	nodes    map[uuid.UUID]*NodeMetadata
+	// In-memory index
+	nodes map[uuid.UUID]*NodeMetadata
+	// In-memory index
 	nameToID map[string]uuid.UUID
 	// Map of each node's UUID to its physical location on disk.
-	nodeToChunk map[uuid.UUID]ChunkLocation
-
-	// Chunk management
+	nodeToChunk  map[uuid.UUID]ChunkLocation
 	chunks       map[int]*Chunk
 	nextChunkID  int
 	currentChunk *Chunk
-
-	// Configuration
-	chunkSize int
-	dataDir   string
-
-	// Concurrency control
-	mu sync.RWMutex
-
-	// WAL for durability
-	wal *WriteAheadLog
+	chunkSize    int
+	dataDir      string
+	mu           sync.RWMutex
+	wal          *WriteAheadLog
 }
 
 // Chunk represents a collection of nodes stored together
@@ -85,15 +78,13 @@ type WALEntry struct {
 	Node      *Node     `json:"node,omitempty"`
 }
 
-// NewPersistentNodeStore creates a new instance of PersistentNodeStore
+// NewPersistentNodeStore creates a new PersistentNodeStore
 func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*PersistentNodeStore, error) {
 
-	// Create data directory if it doesn't exist
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	// Create default store
 	store := &PersistentNodeStore{
 		nodes:       make(map[uuid.UUID]*NodeMetadata),
 		nameToID:    make(map[string]uuid.UUID),
@@ -104,12 +95,10 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 		dataDir:     dataDir,
 	}
 
-	// Apply options
 	for _, option := range options {
 		option(store)
 	}
 
-	// Create data directory if it doesn't exist
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
@@ -130,12 +119,10 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 	store.chunks[store.nextChunkID] = store.currentChunk
 	store.nextChunkID++
 
-	// Load existing data if any
 	if err := store.loadMetadata(); err != nil {
 		return nil, fmt.Errorf("NewPersistentNodeStore: failed to load metadata: %w", err)
 	}
 
-	// Recover from WAL if needed
 	if err := store.RecoverFromWAL(); err != nil {
 		return nil, fmt.Errorf("NewPersistentNodeStore: failed to recover from WAL: %w", err)
 	}
@@ -143,10 +130,10 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 	return store, nil
 }
 
-// StoreOption allows for customizing the store configuration
+// StoreOption, custom store configuration
 type StoreOption func(*PersistentNodeStore)
 
-// WithChunkSize sets the chunk size
+// WithChunkSize to set the chunk size
 func WithChunkSize(size int) StoreOption {
 	return func(s *PersistentNodeStore) {
 		if size > 0 {
@@ -180,10 +167,8 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 		return fmt.Errorf("AddNode: failed to generate UUID: %w", err)
 	}
 
-	// Create new node
 	newNode := newNode(name, id)
 
-	// Create metadata
 	metadata := newNodeMetadata(id)
 
 	// Handle parent relationship
@@ -260,7 +245,7 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	return nil
 }
 
-// estimateNodeSize estimates the size of a node when serialized
+// nodeSize gets the size of a node when serialized
 func (p *PersistentNodeStore) nodeSize(node *Node) (int64, int64, error) {
 	data, err := json.Marshal(node)
 	if err != nil {
