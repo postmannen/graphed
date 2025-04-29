@@ -18,9 +18,7 @@ const DefaultChunkSize = 100
 
 // ChunkLocation represents where a node is stored on disk
 type ChunkLocation struct {
-	ChunkID int   `json:"chunk_id"`
-	Offset  int64 `json:"offset"`
-	Size    int64 `json:"size"`
+	ChunkID int `json:"chunk_id"`
 }
 
 // NodeMetadata to use with in-memory lookup.
@@ -207,16 +205,8 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	p.currentChunk.Modified = true
 
 	// Record location
-	offset, size, err := p.nodeSize(newNode)
-	if err != nil {
-		p.currentChunk.mu.Unlock()
-		return fmt.Errorf("AddNode: failed to estimate node size: %w", err)
-	}
-
 	location := ChunkLocation{
 		ChunkID: p.currentChunk.ID,
-		Offset:  offset,
-		Size:    size,
 	}
 	p.nodeToChunk[id] = location
 	p.currentChunk.mu.Unlock()
@@ -243,16 +233,6 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	}
 
 	return nil
-}
-
-// nodeSize gets the size of a node when serialized
-func (p *PersistentNodeStore) nodeSize(node *Node) (int64, int64, error) {
-	data, err := json.Marshal(node)
-	if err != nil {
-		return 0, 0, fmt.Errorf("nodeSize: failed to marshal node: %w", err)
-	}
-
-	return 0, int64(len(data)), nil
 }
 
 // updateNodeInStorage updates a node in its chunk
@@ -520,8 +500,6 @@ func (p *PersistentNodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
 				// Found the node in a different chunk, update the location
 				p.nodeToChunk[id] = ChunkLocation{
 					ChunkID: chunkID,
-					Offset:  location.Offset, // Keep the same offset for now
-					Size:    location.Size,   // Keep the same size for now
 				}
 
 				// Return the found node
@@ -835,15 +813,8 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 			p.nameToID[entry.Node.Name] = entry.NodeID
 
 			// Record location
-			offset, size, err := p.nodeSize(entry.Node)
-			if err != nil {
-				return fmt.Errorf("RecoverFromWAL: failed to estimate node size: %w", err)
-			}
-
 			p.nodeToChunk[entry.NodeID] = ChunkLocation{
 				ChunkID: p.currentChunk.ID,
-				Offset:  offset,
-				Size:    size,
 			}
 
 		case "update":
