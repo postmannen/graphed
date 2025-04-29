@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -243,7 +244,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 		return fmt.Errorf("updateNodeInStorage: node %s not found in chunk mapping", id)
 	}
 
-	// Get the chunk
+	// Check if the chunk exists.
 	chunk, exists := p.chunks[location.ChunkID]
 	if !exists {
 		// Load the chunk from disk
@@ -255,7 +256,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 		p.chunks[location.ChunkID] = chunk
 	}
 
-	// Get the full node
+	// Get the node from the chunk.
 	node, err := p.getNodeFromChunk(id, chunk)
 	if err != nil {
 		return fmt.Errorf("updateNodeInStorage: failed to get node from chunk: %w", err)
@@ -306,15 +307,16 @@ func (p *PersistentNodeStore) loadChunk(chunkID int) (*Chunk, error) {
 		return nil, fmt.Errorf("loadChunk: failed to read chunk file: %w", err)
 	}
 
-	// Unmarshal
 	var chunk Chunk
 	if err := json.Unmarshal(data, &chunk); err != nil {
 		return nil, fmt.Errorf("loadChunk: failed to unmarshal chunk: %w", err)
 	}
 
-	// Ensure the chunk ID is set correctly
-	// This is important because the ID might not be properly set during unmarshaling
-	chunk.ID = chunkID
+	// TODO: CHECK IF THIS IS SET BEFORE MARSHALING
+	// chunk.ID = chunkID
+	if chunk.ID == 0 {
+		log.Fatalf("loadChunk: chunk ID is not set")
+	}
 
 	return &chunk, nil
 }
