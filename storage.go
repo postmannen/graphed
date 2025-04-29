@@ -891,7 +891,11 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 	}
 
 	// Flush recovered state
-	return p.FlushAll()
+	if err := p.FlushAll(); err != nil {
+		return fmt.Errorf("RecoverFromWAL: failed to flush all chunks: %w", err)
+	}
+
+	return nil
 }
 
 // DebugInfo returns diagnostic information about the store
