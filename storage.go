@@ -312,7 +312,10 @@ func (p *PersistentNodeStore) loadChunk(chunkID int) (*Chunk, error) {
 		return nil, fmt.Errorf("loadChunk: failed to unmarshal chunk: %w", err)
 	}
 
-	// TODO: CHECK IF THIS IS SET BEFORE MARSHALING
+	// TODO: Check if this is set before unmarshalling.
+	//       Adding a check to detect if it might be a
+	//       scenario before removing the code.
+	//
 	// chunk.ID = chunkID
 	if chunk.ID == 0 {
 		log.Fatalf("loadChunk: chunk ID is not set")
