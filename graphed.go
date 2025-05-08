@@ -23,7 +23,13 @@ type Node struct {
 	// Single value. Ex. single log line.
 	Value []byte `json:"value"`
 	// multiple values. Ex. multiple log lines.
-	Values [][]byte                          `json:"values"`
+	Values [][]byte `json:"values"`
+	// A node can have multiple parents, and we use a map of map
+	// to show the relationship with the parent, and what kind
+	// of relationship it is.
+	// The key of the parent map is the type of relationship.
+	// A node can have f.ex. multiple parents of type "Linux",
+	// and multiple parent of type "cloud"
 	Parent map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
 	// HERE !!!!!!!!!!!!
 	Children map[uuid.UUID]struct{} `json:"children,omitempty"`

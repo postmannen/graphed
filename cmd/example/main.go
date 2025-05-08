@@ -11,14 +11,12 @@ import (
 )
 
 func main() {
-	// Create a temporary directory for the example
 	tempDir, err := os.MkdirTemp("", "graphed-example")
 	if err != nil {
 		log.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir) // Clean up when done
+	defer os.RemoveAll(tempDir)
 
-	// Create data directory
 	dataDir := filepath.Join(tempDir, "data")
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
@@ -26,14 +24,13 @@ func main() {
 
 	fmt.Printf("Using data directory: %s\n", dataDir)
 
-	// Create a persistent store with custom chunk size
 	store, err := graphed.NewPersistentNodeStore(dataDir, graphed.WithChunkSize(5))
 	if err != nil {
 		log.Fatalf("Failed to create store: %v", err)
 	}
 	defer store.Close()
 
-	// Add some nodes
+	// Add some nodes.........
 	fmt.Println("Adding nodes...")
 	if err := store.AddNode("root", ""); err != nil {
 		log.Fatalf("Failed to add root node: %v", err)
@@ -57,7 +54,7 @@ func main() {
 		log.Fatalf("Failed to add value to customer2: %v", err)
 	}
 
-	// Add more nodes to demonstrate chunking
+	// Add more nodes to get some chunking
 	fmt.Println("Adding more nodes to demonstrate chunking...")
 	for i := 0; i < 10; i++ {
 		nodeName := fmt.Sprintf("node%d", i)
@@ -66,7 +63,6 @@ func main() {
 		}
 	}
 
-	// Retrieve a node
 	fmt.Println("Retrieving a node...")
 	node, err := store.GetNodeByName("customer1")
 	if err != nil {
@@ -76,48 +72,37 @@ func main() {
 	fmt.Printf("Retrieved node: %s\n", node.Name)
 	fmt.Printf("Node values: %s\n", node.Values[0])
 
-	// Print debug info before closing
 	fmt.Println("\nDebug info before closing:")
 	debugInfo := store.DebugInfo()
 	debugJSON, _ := json.MarshalIndent(debugInfo, "", "  ")
 	fmt.Println(string(debugJSON))
 
-	// Close the store to ensure all data is flushed
+	// Close the store to and flush data to disk.
 	fmt.Println("Closing store...")
 	if err := store.Close(); err != nil {
 		log.Fatalf("Failed to close store: %v", err)
 	}
 
-	// Reopen the store to demonstrate persistence
+	fmt.Println("--------------------------------")
+
+	// Reopen the store
 	fmt.Println("\nReopening store to demonstrate persistence...")
-	store2, err := graphed.NewPersistentNodeStore(dataDir)
+	store2, err := graphed.NewPersistentNodeStore(dataDir, graphed.WithChunkSize(5))
 	if err != nil {
 		log.Fatalf("Failed to reopen store: %v", err)
 	}
 	defer store2.Close()
 
-	// Print debug info after reopening
 	fmt.Println("\nDebug info after reopening:")
 	debugInfo2 := store2.DebugInfo()
 	debugJSON2, _ := json.MarshalIndent(debugInfo2, "", "  ")
 	fmt.Println(string(debugJSON2))
 
-	// Retrieve the same node again
-	fmt.Println("\nRetrieving the same node again...")
+	// Retrieve the first node again
+	fmt.Println("\nRetrieving the first node ...........again...")
 	node2, err := store2.GetNodeByName("customer1")
 	if err != nil {
-		log.Printf("Error retrieving customer1 node after reopening: %v", err)
-
-		// Try to recover by loading all nodes
-		fmt.Println("Attempting to recover by loading all nodes...")
-		allNodes := store2.AllNodes()
-		fmt.Printf("Total nodes in metadata: %d\n", len(allNodes))
-
-		// Try again after loading all nodes
-		node2, err = store2.GetNodeByName("customer1")
-		if err != nil {
-			log.Fatalf("Failed to retrieve customer1 node after recovery attempt: %v", err)
-		}
+		log.Printf("Error: retrieving customer1 node after reopening: %v", err)
 	}
 
 	fmt.Printf("Retrieved node after reopening: %s\n", node2.Name)
