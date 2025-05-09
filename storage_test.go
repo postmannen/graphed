@@ -23,7 +23,7 @@ func TestPersistentNodeStore(t *testing.T) {
 	// Test basic operations
 	t.Run("BasicOperations", func(t *testing.T) {
 		// Create a new store
-		store, err := NewPersistentNodeStore(dataDir, WithChunkSize(5))
+		store, err := NewNodeStore(dataDir, WithChunkSize(5))
 		if err != nil {
 			t.Fatalf("Failed to create store: %v", err)
 		}
@@ -85,7 +85,7 @@ func TestPersistentNodeStore(t *testing.T) {
 	// Test persistence
 	t.Run("Persistence", func(t *testing.T) {
 		// Create a new store
-		store1, err := NewPersistentNodeStore(dataDir)
+		store1, err := NewNodeStore(dataDir)
 		if err != nil {
 			t.Fatalf("Failed to create store: %v", err)
 		}
@@ -106,7 +106,7 @@ func TestPersistentNodeStore(t *testing.T) {
 		}
 
 		// Create a new store with the same data directory
-		store2, err := NewPersistentNodeStore(dataDir)
+		store2, err := NewNodeStore(dataDir)
 		if err != nil {
 			t.Fatalf("Failed to create second store: %v", err)
 		}
@@ -130,7 +130,7 @@ func TestPersistentNodeStore(t *testing.T) {
 	// Test chunking
 	t.Run("Chunking", func(t *testing.T) {
 		// Create a new store with small chunk size
-		store, err := NewPersistentNodeStore(dataDir, WithChunkSize(3))
+		store, err := NewNodeStore(dataDir, WithChunkSize(3))
 		if err != nil {
 			t.Fatalf("Failed to create store: %v", err)
 		}
@@ -184,7 +184,7 @@ func TestPersistentNodeStore(t *testing.T) {
 	// Test adapter
 	t.Run("Adapter", func(t *testing.T) {
 		// Create a new adapter
-		adapter, err := NewPersistentNodeStore(dataDir)
+		adapter, err := NewNodeStore(dataDir)
 		if err != nil {
 			t.Fatalf("Failed to create adapter: %v", err)
 		}

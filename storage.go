@@ -70,8 +70,8 @@ func newNodeMetadata(id uuid.UUID) *NodeMetadata {
 	}
 }
 
-// PersistentNodeStore, NodeStore with disk persistence.
-type PersistentNodeStore struct {
+// NodeStore, NodeStore with disk persistence.
+type NodeStore struct {
 	// In-memory index
 	nodes map[uuid.UUID]*NodeMetadata
 	// In-memory index
@@ -110,14 +110,14 @@ type WALEntry struct {
 	Node      *Node     `json:"node,omitempty"`
 }
 
-// NewPersistentNodeStore creates a new PersistentNodeStore
-func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*PersistentNodeStore, error) {
+// NewNodeStore creates a new NodeStore
+func NewNodeStore(dataDir string, options ...StoreOption) (*NodeStore, error) {
 
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	store := &PersistentNodeStore{
+	store := &NodeStore{
 		nodes:       make(map[uuid.UUID]*NodeMetadata),
 		nameToID:    make(map[string]uuid.UUID),
 		nodeToChunk: make(map[uuid.UUID]ChunkLocation),
@@ -163,11 +163,11 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 }
 
 // StoreOption, custom store configuration
-type StoreOption func(*PersistentNodeStore)
+type StoreOption func(*NodeStore)
 
 // WithChunkSize to set the chunk size
 func WithChunkSize(size int) StoreOption {
-	return func(s *PersistentNodeStore) {
+	return func(s *NodeStore) {
 		if size > 0 {
 			s.chunkSize = size
 		}
@@ -189,7 +189,7 @@ func newWriteAheadLog(dataDir string) (*WriteAheadLog, error) {
 }
 
 // AddNode adds a new node to the store
-func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
+func (p *NodeStore) AddNode(name string, parentName string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -270,7 +270,7 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 }
 
 // updateNodeInStorage updates a node in its chunk
-func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
+func (p *NodeStore) updateNodeInStorage(id uuid.UUID) error {
 	// Find the chunk containing this node
 	location, exists := p.nodeToChunk[id]
 	if !exists {
@@ -313,7 +313,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 }
 
 // getNodeFromChunk gets a node from a chunk.
-func (p *PersistentNodeStore) getNodeFromChunk(id uuid.UUID, chunk *Chunk) (*Node, error) {
+func (p *NodeStore) getNodeFromChunk(id uuid.UUID, chunk *Chunk) (*Node, error) {
 	chunk.mu.RLock()
 	defer chunk.mu.RUnlock()
 
@@ -326,7 +326,7 @@ func (p *PersistentNodeStore) getNodeFromChunk(id uuid.UUID, chunk *Chunk) (*Nod
 }
 
 // loadChunk loads a chunk from disk
-func (p *PersistentNodeStore) loadChunk(chunkID int) (*Chunk, error) {
+func (p *NodeStore) loadChunk(chunkID int) (*Chunk, error) {
 	chunkPath := filepath.Join(p.dataDir, fmt.Sprintf("chunk_%d.json", chunkID))
 
 	// Check if file exists
@@ -358,7 +358,7 @@ func (p *PersistentNodeStore) loadChunk(chunkID int) (*Chunk, error) {
 }
 
 // flushChunk writes a chunk to disk
-func (ps *PersistentNodeStore) flushChunk(chunkID int) error {
+func (ps *NodeStore) flushChunk(chunkID int) error {
 	chunk, exists := ps.chunks[chunkID]
 	if !exists {
 		return fmt.Errorf("flushChunk: chunk %d not found", chunkID)
@@ -391,7 +391,7 @@ func (ps *PersistentNodeStore) flushChunk(chunkID int) error {
 }
 
 // FlushAll writes all modified chunks to disk
-func (p *PersistentNodeStore) FlushAll() error {
+func (p *NodeStore) FlushAll() error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -410,7 +410,7 @@ func (p *PersistentNodeStore) FlushAll() error {
 }
 
 // saveMetadata saves the store's metadata to disk
-func (p *PersistentNodeStore) saveMetadata() error {
+func (p *NodeStore) saveMetadata() error {
 	metadataPath := filepath.Join(p.dataDir, "metadata.json")
 
 	// Create metadata structure
@@ -441,7 +441,7 @@ func (p *PersistentNodeStore) saveMetadata() error {
 }
 
 // loadMetadata loads the store's metadata from disk
-func (p *PersistentNodeStore) loadMetadata() error {
+func (p *NodeStore) loadMetadata() error {
 	metadataPath := filepath.Join(p.dataDir, "metadata.json")
 
 	// Check if file exists
@@ -478,7 +478,7 @@ func (p *PersistentNodeStore) loadMetadata() error {
 }
 
 // GetNodeByName retrieves a node by name
-func (p *PersistentNodeStore) GetNodeByName(name string) (*Node, error) {
+func (p *NodeStore) GetNodeByName(name string) (*Node, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -500,7 +500,7 @@ func (p *PersistentNodeStore) GetNodeByName(name string) (*Node, error) {
 	return node, nil
 }
 
-func (p *PersistentNodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
+func (p *NodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
 	// Get node location
 	location, exists := p.nodeToChunk[id]
 	if !exists {
@@ -553,7 +553,7 @@ func (p *PersistentNodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
 }
 
 // GetAllChildNodes retrieves all child nodes of a node.
-func (p *PersistentNodeStore) GetAllChildNodes(name string) ([]*Node, error) {
+func (p *NodeStore) GetAllChildNodes(name string) ([]*Node, error) {
 	n, err := p.GetNodeByName(name)
 	if err != nil {
 		return nil, fmt.Errorf("GetAllChildNodes: %w", err)
@@ -573,7 +573,7 @@ func (p *PersistentNodeStore) GetAllChildNodes(name string) ([]*Node, error) {
 }
 
 // GetNodeParent retrieves the parent of a node
-func (p *PersistentNodeStore) GetNodeParents(name string) ([]*Node, error) {
+func (p *NodeStore) GetNodeParents(name string) ([]*Node, error) {
 	n, err := p.GetNodeByName(name)
 	if err != nil {
 		return nil, fmt.Errorf("GetNodeParents: %w", err)
@@ -595,7 +595,7 @@ func (p *PersistentNodeStore) GetNodeParents(name string) ([]*Node, error) {
 // AllNodes returns all nodes in the store
 // Note: This returns metadata only, not the full nodes with values
 // TODO: Check if we need this!!!
-func (p *PersistentNodeStore) AllNodesMetadata() map[uuid.UUID]*Node {
+func (p *NodeStore) AllNodesMetadata() map[uuid.UUID]*Node {
 	// Load all nodes from disk
 	nodes, err := p.LoadAllNodes()
 	if err != nil {
@@ -606,7 +606,7 @@ func (p *PersistentNodeStore) AllNodesMetadata() map[uuid.UUID]*Node {
 }
 
 // AddToValues adds a value to a node's values
-func (p *PersistentNodeStore) AddToValues(name string, value []byte) error {
+func (p *NodeStore) AddToValues(name string, value []byte) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -716,7 +716,7 @@ func (w *WriteAheadLog) writeEntry(entry WALEntry) error {
 }
 
 // Close closes the store and ensures all data is flushed to disk
-func (p *PersistentNodeStore) Close() error {
+func (p *NodeStore) Close() error {
 	// Flush all chunks
 	if err := p.FlushAll(); err != nil {
 		return fmt.Errorf("Close: failed to flush all chunks: %w", err)
@@ -731,7 +731,7 @@ func (p *PersistentNodeStore) Close() error {
 }
 
 // AllNodes returns all nodes in the store (metadata only)
-func (p *PersistentNodeStore) AllNodes() map[uuid.UUID]*NodeMetadata {
+func (p *NodeStore) AllNodes() map[uuid.UUID]*NodeMetadata {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -742,7 +742,7 @@ func (p *PersistentNodeStore) AllNodes() map[uuid.UUID]*NodeMetadata {
 //
 // The nodes are stored in chunks on disk, and the nodeToChunk map
 // contains the location of each node in the correct chunk.
-func (p *PersistentNodeStore) LoadAllNodes() (map[uuid.UUID]*Node, error) {
+func (p *NodeStore) LoadAllNodes() (map[uuid.UUID]*Node, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -780,7 +780,7 @@ func (p *PersistentNodeStore) LoadAllNodes() (map[uuid.UUID]*Node, error) {
 //
 // An 8-byte length prefix, followed by the data entry of that length.
 // The length is stored as a 64-bit little-endian encoded uint64.
-func (p *PersistentNodeStore) RecoverFromWAL() error {
+func (p *NodeStore) RecoverFromWAL() error {
 	walPath := filepath.Join(p.dataDir, "wal.log")
 
 	// Check if WAL exists
@@ -908,7 +908,7 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 }
 
 // DebugInfo returns diagnostic information about the store
-func (p *PersistentNodeStore) DebugInfo() map[string]interface{} {
+func (p *NodeStore) DebugInfo() map[string]interface{} {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 

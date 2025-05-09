@@ -24,7 +24,7 @@ func main() {
 
 	fmt.Printf("Using data directory: %s\n", dataDir)
 
-	store, err := graphed.NewPersistentNodeStore(dataDir, graphed.WithChunkSize(5))
+	store, err := graphed.NewNodeStore(dataDir, graphed.WithChunkSize(5))
 	if err != nil {
 		log.Fatalf("Failed to create store: %v", err)
 	}
@@ -87,7 +87,7 @@ func main() {
 
 	// Reopen the store
 	fmt.Println("\nReopening store to demonstrate persistence...")
-	store2, err := graphed.NewPersistentNodeStore(dataDir, graphed.WithChunkSize(5))
+	store2, err := graphed.NewNodeStore(dataDir, graphed.WithChunkSize(5))
 	if err != nil {
 		log.Fatalf("Failed to reopen store: %v", err)
 	}
