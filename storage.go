@@ -14,6 +14,39 @@ import (
 	"github.com/gofrs/uuid"
 )
 
+// Node in graph
+type Node struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	// TODO: Make use of timestamp
+	Timestamp time.Time `json:"timestamp"`
+	// Single value. Ex. single log line.
+	Value []byte `json:"value"`
+	// multiple values. Ex. multiple log lines.
+	Values [][]byte `json:"values"`
+	// A node can have multiple parents, and we use a map of map
+	// to show the relationship with the parent, and what kind
+	// of relationship it is.
+	// The key of the parent map is the type of relationship.
+	// A node can have f.ex. multiple parents of type "Linux",
+	// and multiple parent of type "cloud"
+	Parent map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
+	// HERE !!!!!!!!!!!!
+	Children map[uuid.UUID]struct{} `json:"children,omitempty"`
+}
+
+func newNode(name string, id uuid.UUID) *Node {
+	n := Node{
+		ID:       id,
+		Name:     name,
+		Values:   make([][]byte, 0),
+		Parent:   make(map[string]map[uuid.UUID]struct{}),
+		Children: make(map[uuid.UUID]struct{}),
+	}
+
+	return &n
+}
+
 // ChunkSize, how many nodes are stored in a single chunk file
 const DefaultChunkSize = 100
 
