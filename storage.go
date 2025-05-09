@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,17 +14,15 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// ChunkSize defines how many nodes are stored in a single chunk file
+// ChunkSize, how many nodes are stored in a single chunk file
 const DefaultChunkSize = 100
 
 // ChunkLocation represents where a node is stored on disk
 type ChunkLocation struct {
-	ChunkID int   `json:"chunk_id"`
-	Offset  int64 `json:"offset"`
-	Size    int64 `json:"size"`
+	ChunkID int `json:"chunk_id"`
 }
 
-// NodeMetadata contains the lightweight information about the nodes in memory.
+// NodeMetadata to use with in-memory lookup.
 type NodeMetadata struct {
 	ID       uuid.UUID                         `json:"id"`
 	Parent   map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
@@ -38,28 +37,21 @@ func newNodeMetadata(id uuid.UUID) *NodeMetadata {
 	}
 }
 
-// PersistentNodeStore extends the in-memory NodeStore with disk persistence.
+// PersistentNodeStore, NodeStore with disk persistence.
 type PersistentNodeStore struct {
-	// In-memory indexes
-	nodes    map[uuid.UUID]*NodeMetadata
+	// In-memory index
+	nodes map[uuid.UUID]*NodeMetadata
+	// In-memory index
 	nameToID map[string]uuid.UUID
 	// Map of each node's UUID to its physical location on disk.
-	nodeToChunk map[uuid.UUID]ChunkLocation
-
-	// Chunk management
+	nodeToChunk  map[uuid.UUID]ChunkLocation
 	chunks       map[int]*Chunk
 	nextChunkID  int
 	currentChunk *Chunk
-
-	// Configuration
-	chunkSize int
-	dataDir   string
-
-	// Concurrency control
-	mu sync.RWMutex
-
-	// WAL for durability
-	wal *WriteAheadLog
+	chunkSize    int
+	dataDir      string
+	mu           sync.RWMutex
+	wal          *WriteAheadLog
 }
 
 // Chunk represents a collection of nodes stored together
@@ -85,15 +77,13 @@ type WALEntry struct {
 	Node      *Node     `json:"node,omitempty"`
 }
 
-// NewPersistentNodeStore creates a new instance of PersistentNodeStore
+// NewPersistentNodeStore creates a new PersistentNodeStore
 func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*PersistentNodeStore, error) {
 
-	// Create data directory if it doesn't exist
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	// Create default store
 	store := &PersistentNodeStore{
 		nodes:       make(map[uuid.UUID]*NodeMetadata),
 		nameToID:    make(map[string]uuid.UUID),
@@ -104,12 +94,10 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 		dataDir:     dataDir,
 	}
 
-	// Apply options
 	for _, option := range options {
 		option(store)
 	}
 
-	// Create data directory if it doesn't exist
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
@@ -130,12 +118,10 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 	store.chunks[store.nextChunkID] = store.currentChunk
 	store.nextChunkID++
 
-	// Load existing data if any
 	if err := store.loadMetadata(); err != nil {
 		return nil, fmt.Errorf("NewPersistentNodeStore: failed to load metadata: %w", err)
 	}
 
-	// Recover from WAL if needed
 	if err := store.RecoverFromWAL(); err != nil {
 		return nil, fmt.Errorf("NewPersistentNodeStore: failed to recover from WAL: %w", err)
 	}
@@ -143,10 +129,10 @@ func NewPersistentNodeStore(dataDir string, options ...StoreOption) (*Persistent
 	return store, nil
 }
 
-// StoreOption allows for customizing the store configuration
+// StoreOption, custom store configuration
 type StoreOption func(*PersistentNodeStore)
 
-// WithChunkSize sets the chunk size
+// WithChunkSize to set the chunk size
 func WithChunkSize(size int) StoreOption {
 	return func(s *PersistentNodeStore) {
 		if size > 0 {
@@ -180,10 +166,8 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 		return fmt.Errorf("AddNode: failed to generate UUID: %w", err)
 	}
 
-	// Create new node
 	newNode := newNode(name, id)
 
-	// Create metadata
 	metadata := newNodeMetadata(id)
 
 	// Handle parent relationship
@@ -222,16 +206,8 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	p.currentChunk.Modified = true
 
 	// Record location
-	offset, size, err := p.nodeSize(newNode)
-	if err != nil {
-		p.currentChunk.mu.Unlock()
-		return fmt.Errorf("AddNode: failed to estimate node size: %w", err)
-	}
-
 	location := ChunkLocation{
 		ChunkID: p.currentChunk.ID,
-		Offset:  offset,
-		Size:    size,
 	}
 	p.nodeToChunk[id] = location
 	p.currentChunk.mu.Unlock()
@@ -260,16 +236,6 @@ func (p *PersistentNodeStore) AddNode(name string, parentName string) error {
 	return nil
 }
 
-// estimateNodeSize estimates the size of a node when serialized
-func (p *PersistentNodeStore) nodeSize(node *Node) (int64, int64, error) {
-	data, err := json.Marshal(node)
-	if err != nil {
-		return 0, 0, fmt.Errorf("nodeSize: failed to marshal node: %w", err)
-	}
-
-	return 0, int64(len(data)), nil
-}
-
 // updateNodeInStorage updates a node in its chunk
 func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 	// Find the chunk containing this node
@@ -278,7 +244,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 		return fmt.Errorf("updateNodeInStorage: node %s not found in chunk mapping", id)
 	}
 
-	// Get the chunk
+	// Check if the chunk exists.
 	chunk, exists := p.chunks[location.ChunkID]
 	if !exists {
 		// Load the chunk from disk
@@ -290,7 +256,7 @@ func (p *PersistentNodeStore) updateNodeInStorage(id uuid.UUID) error {
 		p.chunks[location.ChunkID] = chunk
 	}
 
-	// Get the full node
+	// Get the node from the chunk.
 	node, err := p.getNodeFromChunk(id, chunk)
 	if err != nil {
 		return fmt.Errorf("updateNodeInStorage: failed to get node from chunk: %w", err)
@@ -341,15 +307,19 @@ func (p *PersistentNodeStore) loadChunk(chunkID int) (*Chunk, error) {
 		return nil, fmt.Errorf("loadChunk: failed to read chunk file: %w", err)
 	}
 
-	// Unmarshal
 	var chunk Chunk
 	if err := json.Unmarshal(data, &chunk); err != nil {
 		return nil, fmt.Errorf("loadChunk: failed to unmarshal chunk: %w", err)
 	}
 
-	// Ensure the chunk ID is set correctly
-	// This is important because the ID might not be properly set during unmarshaling
-	chunk.ID = chunkID
+	// TODO: Check if this is set before unmarshalling.
+	//       Adding a check to detect if it might be a
+	//       scenario before removing the code.
+	//
+	// chunk.ID = chunkID
+	if chunk.ID == 0 {
+		log.Fatalf("loadChunk: chunk ID is not set")
+	}
 
 	return &chunk, nil
 }
@@ -535,8 +505,6 @@ func (p *PersistentNodeStore) GetNodeByID(id uuid.UUID) (*Node, error) {
 				// Found the node in a different chunk, update the location
 				p.nodeToChunk[id] = ChunkLocation{
 					ChunkID: chunkID,
-					Offset:  location.Offset, // Keep the same offset for now
-					Size:    location.Size,   // Keep the same size for now
 				}
 
 				// Return the found node
@@ -850,15 +818,8 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 			p.nameToID[entry.Node.Name] = entry.NodeID
 
 			// Record location
-			offset, size, err := p.nodeSize(entry.Node)
-			if err != nil {
-				return fmt.Errorf("RecoverFromWAL: failed to estimate node size: %w", err)
-			}
-
 			p.nodeToChunk[entry.NodeID] = ChunkLocation{
 				ChunkID: p.currentChunk.ID,
-				Offset:  offset,
-				Size:    size,
 			}
 
 		case "update":
@@ -906,7 +867,11 @@ func (p *PersistentNodeStore) RecoverFromWAL() error {
 	}
 
 	// Flush recovered state
-	return p.FlushAll()
+	if err := p.FlushAll(); err != nil {
+		return fmt.Errorf("RecoverFromWAL: failed to flush all chunks: %w", err)
+	}
+
+	return nil
 }
 
 // DebugInfo returns diagnostic information about the store
