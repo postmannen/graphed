@@ -30,7 +30,7 @@ type Node struct {
 	// The key of the parent map is the type of relationship.
 	// A node can have f.ex. multiple parents of type "Linux",
 	// and multiple parent of type "cloud"
-	Parent map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
+	Parent map[relationship]map[uuid.UUID]struct{} `json:"parent,omitempty"`
 	// HERE !!!!!!!!!!!!
 	Children map[uuid.UUID]struct{} `json:"children,omitempty"`
 }
@@ -40,12 +40,14 @@ func newNode(name string, id uuid.UUID) *Node {
 		ID:       id,
 		Name:     name,
 		Values:   make([][]byte, 0),
-		Parent:   make(map[string]map[uuid.UUID]struct{}),
+		Parent:   make(map[relationship]map[uuid.UUID]struct{}),
 		Children: make(map[uuid.UUID]struct{}),
 	}
 
 	return &n
 }
+
+type relationship string
 
 // ChunkSize, how many nodes are stored in a single chunk file
 const DefaultChunkSize = 100
@@ -57,15 +59,15 @@ type ChunkLocation struct {
 
 // NodeMetadata to use with in-memory lookup.
 type NodeMetadata struct {
-	ID       uuid.UUID                         `json:"id"`
-	Parent   map[string]map[uuid.UUID]struct{} `json:"parent,omitempty"`
-	Children map[uuid.UUID]struct{}            `json:"children,omitempty"`
+	ID       uuid.UUID                               `json:"id"`
+	Parent   map[relationship]map[uuid.UUID]struct{} `json:"parent,omitempty"`
+	Children map[uuid.UUID]struct{}                  `json:"children,omitempty"`
 }
 
 func newNodeMetadata(id uuid.UUID) *NodeMetadata {
 	return &NodeMetadata{
 		ID:       id,
-		Parent:   make(map[string]map[uuid.UUID]struct{}),
+		Parent:   make(map[relationship]map[uuid.UUID]struct{}),
 		Children: make(map[uuid.UUID]struct{}),
 	}
 }
