@@ -219,6 +219,8 @@ func (p *NodeStore) AddNode(name string, parentName string) error {
 		parentMeta.Children["relationship"] = make(map[uuid.UUID]struct{})
 		parentMeta.Children["relationship"][id] = struct{}{}
 
+		fmt.Printf("DEBUG: parentMeta for %s: %v\n", parentName, parentMeta.Children["relationship"])
+
 		// Update parent node in storage
 		if err := p.updateNodeInStorage(parentID); err != nil {
 			return fmt.Errorf("AddNode: failed to update parent node: %w", err)
@@ -298,11 +300,13 @@ func (p *NodeStore) updateNodeInStorage(id uuid.UUID) error {
 		return fmt.Errorf("updateNodeInStorage: failed to get node from chunk: %w", err)
 	}
 
-	// Update the node's metadata from memory
+	// Update the from the node metadata
 	metadata := p.nodes[id]
 	node.Children = metadata.Children
+	fmt.Printf("--- DEBUG, updateNodeInStorage: node.Children for %s: %v\n", node.Name, node.Children)
 
 	// Mark chunk as modified
+	// TODO: Add date here for when it was updated.
 	chunk.mu.Lock()
 	chunk.Modified = true
 	chunk.mu.Unlock()

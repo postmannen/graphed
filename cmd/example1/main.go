@@ -51,12 +51,28 @@ func main() {
 	}
 
 	fmt.Printf("Retrieved node: %s\n", node.Name)
-	fmt.Printf("Node values: %s\n", node.Values[0])
+	// fmt.Printf("Node values: %s\n", node.Values[0])
 
 	fmt.Println("\nDebug info before closing:")
 	debugInfo := store.DebugInfo()
 	debugJSON, _ := json.MarshalIndent(debugInfo, "", "  ")
 	fmt.Println(string(debugJSON))
+
+	fmt.Println("--------------------------------")
+
+	// List all nodes
+	fmt.Println("\nListing all nodes:")
+	allNodes, err := store.LoadAllNodes()
+	if err != nil {
+		log.Fatalf("Failed to load all nodes: %v", err)
+	}
+	fmt.Printf("Total nodes: %d\n", len(allNodes))
+	for id, node := range allNodes {
+		fmt.Printf("Node ID: %s, Name: %s, Parents: %v, Children: %v\n", id, node.Name, node.Parent, node.Children)
+		if len(node.Values) > 0 {
+			fmt.Printf("    Node values: %s\n", node.Values[0])
+		}
+	}
 
 	// Close the store to and flush data to disk.
 	fmt.Println("Closing store...")
@@ -91,7 +107,7 @@ func main() {
 
 	// List all nodes
 	fmt.Println("\nListing all nodes:")
-	allNodes, err := store2.LoadAllNodes()
+	allNodes, err = store2.LoadAllNodes()
 	if err != nil {
 		log.Fatalf("Failed to load all nodes: %v", err)
 	}
@@ -102,6 +118,4 @@ func main() {
 			fmt.Printf("    Node values: %s\n", node.Values[0])
 		}
 	}
-
-	fmt.Println("\nExample completed successfully!")
 }
