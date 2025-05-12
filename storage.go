@@ -32,7 +32,7 @@ type Node struct {
 	// and multiple parent of type "cloud"
 	Parent map[relationship]map[uuid.UUID]struct{} `json:"parent,omitempty"`
 	// HERE !!!!!!!!!!!!
-	Children map[uuid.UUID]struct{} `json:"children,omitempty"`
+	Children map[relationship]map[uuid.UUID]struct{} `json:"children,omitempty"`
 }
 
 func newNode(name string, id uuid.UUID) *Node {
@@ -41,7 +41,7 @@ func newNode(name string, id uuid.UUID) *Node {
 		Name:     name,
 		Values:   make([][]byte, 0),
 		Parent:   make(map[relationship]map[uuid.UUID]struct{}),
-		Children: make(map[uuid.UUID]struct{}),
+		Children: make(map[relationship]map[uuid.UUID]struct{}),
 	}
 
 	return &n
@@ -61,14 +61,14 @@ type ChunkLocation struct {
 type NodeMetadata struct {
 	ID       uuid.UUID                               `json:"id"`
 	Parent   map[relationship]map[uuid.UUID]struct{} `json:"parent,omitempty"`
-	Children map[uuid.UUID]struct{}                  `json:"children,omitempty"`
+	Children map[relationship]map[uuid.UUID]struct{} `json:"children,omitempty"`
 }
 
 func newNodeMetadata(id uuid.UUID) *NodeMetadata {
 	return &NodeMetadata{
 		ID:       id,
 		Parent:   make(map[relationship]map[uuid.UUID]struct{}),
-		Children: make(map[uuid.UUID]struct{}),
+		Children: make(map[relationship]map[uuid.UUID]struct{}),
 	}
 }
 
@@ -216,7 +216,8 @@ func (p *NodeStore) AddNode(name string, parentName string) error {
 
 		// Update parent's children
 		parentMeta := p.nodes[parentID]
-		parentMeta.Children[id] = struct{}{}
+		parentMeta.Children["relationship"] = make(map[uuid.UUID]struct{})
+		parentMeta.Children["relationship"][id] = struct{}{}
 
 		// Update parent node in storage
 		if err := p.updateNodeInStorage(parentID); err != nil {
@@ -563,12 +564,19 @@ func (p *NodeStore) GetAllChildNodes(name string) ([]*Node, error) {
 
 	children := make([]*Node, 0, len(n.Children))
 
-	for childID := range n.Children {
-		child, err := p.GetNodeByID(childID)
-		if err != nil {
-			return nil, fmt.Errorf("GetAllChildNodes: %w", err)
+	// Range over the relationships.
+	// TODO: Since the value of a relationship for now is set to "relationship",
+	// we don't use the key. This needs to be changed in the future when realtionships
+	// can have different values.
+	for _, idMap := range n.Children {
+
+		for childID := range idMap {
+			child, err := p.GetNodeByID(childID)
+			if err != nil {
+				return nil, fmt.Errorf("GetAllChildNodes: %w", err)
+			}
+			children = append(children, child)
 		}
-		children = append(children, child)
 	}
 
 	return children, nil
@@ -888,10 +896,13 @@ func (p *NodeStore) RecoverFromWAL() error {
 			// Update metadata
 			metadata, exists := p.nodes[entry.NodeID]
 			if !exists {
+				uuidMap := make(map[uuid.UUID]struct{})
 				metadata = &NodeMetadata{
 					ID:       entry.Node.ID,
-					Children: make(map[uuid.UUID]struct{}),
+					Children: make(map[relationship]map[uuid.UUID]struct{}),
 				}
+				metadata.Children["relationship"] = uuidMap
+
 				p.nodes[entry.NodeID] = metadata
 				p.nameToID[entry.Node.Name] = entry.NodeID
 			}

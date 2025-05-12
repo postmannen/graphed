@@ -159,13 +159,15 @@ func benchmarkGetChild(nodeName string, store *NodeStore) (string, bool) {
 	}
 
 	// Pick the first child, retrieve it by ID and return the name.
-	for childID := range nd.Children {
-		n, err := store.GetNodeByID(childID)
-		if err != nil {
-			log.Printf("Failed to retrieve node ID: %v : %v\n", nodeName, err)
-		}
+	for _, idMap := range nd.Children {
+		for childID := range idMap {
+			n, err := store.GetNodeByID(childID)
+			if err != nil {
+				log.Printf("Failed to retrieve node ID: %v : %v\n", nodeName, err)
+			}
 
-		return n.Name, true
+			return n.Name, true
+		}
 	}
 
 	return "", false
