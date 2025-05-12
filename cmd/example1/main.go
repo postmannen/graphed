@@ -103,7 +103,9 @@ func main() {
 	}
 
 	fmt.Printf("Retrieved node after reopening: %s\n", node2.Name)
-	fmt.Printf("Node values after reopening: %s\n", node2.Values[0])
+	if len(node2.Values) > 0 {
+		fmt.Printf("Node values after reopening: %s\n", node2.Values[0])
+	}
 
 	// List all nodes
 	fmt.Println("\nListing all nodes:")
@@ -114,8 +116,10 @@ func main() {
 	fmt.Printf("Total nodes: %d\n", len(allNodes))
 	for id, node := range allNodes {
 		fmt.Printf("Node ID: %s, Name: %s, Parents: %v, Children: %v\n", id, node.Name, node.Parent, node.Children)
-		if len(node.Values) > 0 {
-			fmt.Printf("    Node values: %s\n", node.Values[0])
+		if len(node.Children) > 0 {
+			for rel, idMap := range node.Children {
+				fmt.Printf("DEBUG:    Relationship: %s, Children: %v\n", rel, idMap)
+			}
 		}
 	}
 }
