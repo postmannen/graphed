@@ -216,7 +216,9 @@ func (p *NodeStore) AddNode(name string, parentName string) error {
 
 		// Update parent's children
 		parentMeta := p.nodes[parentID]
-		parentMeta.Children["relationship"] = make(map[uuid.UUID]struct{})
+		if parentMeta.Children["relationship"] == nil {
+			parentMeta.Children["relationship"] = make(map[uuid.UUID]struct{})
+		}
 		parentMeta.Children["relationship"][id] = struct{}{}
 
 		fmt.Printf("DEBUG: parentMeta for %s: %v\n", parentName, parentMeta.Children["relationship"])
